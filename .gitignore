@@ -1,7 +1,6 @@
-# Ignore .env file
+**/__pycache__/
+
 .env
-_tests
-*.json
 *.log
 
 _output/*.txt
