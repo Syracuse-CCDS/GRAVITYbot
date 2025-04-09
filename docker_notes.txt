@@ -1,0 +1,14 @@
+docker build -t gravitybot . 
+
+##run shell
+docker run -it --entrypoint bash --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot
+docker run -it --entrypoint bash --mount src=.,target=/var/task,type=bind gravitybot
+docker run -it --entrypoint bash --mount src=/opt/gravitybot,target=/var/task,type=bind gravitybot
+
+## every tuesdays and fridays
+docker run -it --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__alog_summary_main__.py
+sudo crontab -e 0 19 * * 2,5 docker run -it --mount src=/opt/gravitybot,target=/var/task,type=bind gravitybot python ./_src/__alog_summary_main__.py >> /opt/gravitybot/jobs.log 2>&1
+
+# every monday
+docker run -it --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__talk_summary_main__.py 
+sudo crontab -e 0 19 * * 1 docker run -it --mount src=/opt/gravitybot,target=/var/task,type=bind gravitybot python ./_src/__talk_summary_main__.py >> /opt/gravitybot/jobs.log 2>&1
