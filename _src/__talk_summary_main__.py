@@ -221,8 +221,10 @@ def main():
         with open(f'./_output/ZooniverseTalkSummary_{current_day}.md', 'w') as gsBotResp:
             gsBotResp.write(gsBot)
             gsBotResp.close()
-    except:
-        print("WARNING: No Zooniverse Talk Summary file saved.")
+    except Exception as e:
+        print("WARNING: No Zooniverse Talk Summary file saved due to an exception")
+        print(e)
+        return
 
     # Sending Email containing Zooniverse Talk summary
     print("Sending Email...")
