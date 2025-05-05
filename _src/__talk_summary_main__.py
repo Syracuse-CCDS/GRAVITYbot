@@ -249,5 +249,9 @@ def main():
     email = emails.main(date = current_day, body = gsBot)
     #except:
     #    print("WARNING: Email failed to send.")
-     
+
+    print("------------------")
+    print("Ending talk summary...")
+    print("------------------")
+
 gsBotResponse = main()
