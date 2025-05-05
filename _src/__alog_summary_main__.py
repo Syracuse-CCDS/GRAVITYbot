@@ -22,6 +22,20 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_dat
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_output')))
 import prompts, alog, emails, alogPosts
 
+## ----------------------
+## Monkey Patch print() for better debugging
+## it would probably be better to use logging, but this is easier for now.
+## ----------------------
+_print=print
+def print(*args, **kwargs):
+    # Add a timestamp to the print function
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Call the original print function with the timestamp
+    _print(f"{__file__}[{timestamp}] ", *args, **kwargs)
+## ----------------------
+
+
 # Example of how to import a prompt from prompts py file.
 #####################################################################################################
 # Functions #########################################################################################
@@ -169,6 +183,9 @@ def chat_with_gpt4(user_prompt, sys_prompt):
 
 # Main Function: Calls all previous functions for a user specified time frame
 def main():
+    print("------------------")
+    print("Starting ALOG Summary...")
+    print("------------------")
 
     # Retrieve most updated alog data
     alogdata = alog.main()
@@ -219,5 +236,9 @@ def main():
     except:
         print("WARNING: No LHO aLOG Summary file saved.")
     alogPosts.alog_discussion_post(current_day)
-     
+
+    print("------------------")
+    print("Ending ALOG Summary...")
+    print("------------------")
+
 gsBotResponse = main()

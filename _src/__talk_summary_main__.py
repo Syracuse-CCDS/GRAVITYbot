@@ -23,6 +23,20 @@ from dotenv import find_dotenv, load_dotenv
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_output')))
 import prompts, talk_data, emails
+
+## ----------------------
+## Monkey Patch print() for better debugging
+## it would probably be better to use logging, but this is easier for now.
+## ----------------------
+_print=print
+def print(*args, **kwargs):
+    # Add a timestamp to the print function
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Call the original print function with the timestamp
+    _print(f"{__file__}[{timestamp}] ", *args, **kwargs)
+## ----------------------
+
 #####################################################################################################
 # Functions #########################################################################################
 # 0. start_end_dates    :   produces two adjacent weeks spans
@@ -195,6 +209,9 @@ def chat_with_gpt4(user_prompt, sys_prompt):
     return response.choices[0].message.content
 
 def main():
+    print("------------------")
+    print("Starting talk summary...")
+    print("------------------")
 
     # Get Talk Data from Panoptes API
     talkdata = talk_data.main()
