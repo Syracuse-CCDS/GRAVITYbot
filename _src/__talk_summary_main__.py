@@ -34,7 +34,7 @@ def print(*args, **kwargs):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Call the original print function with the timestamp
-    _print(f"{__file__}[{timestamp}] ", *args, **kwargs)
+    _print(f"{os.path.basename(__file__)}[{timestamp}] ", *args, **kwargs)
 ## ----------------------
 
 #####################################################################################################
