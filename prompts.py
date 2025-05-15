@@ -58,6 +58,7 @@ def ex_func_prompt_gen(talk_dat):
 #       **Additional Considerations and Observations**: The community is actively engaging in the use of tools like GWpy for analyzing glitches, prompting discussions on the effectiveness and limitations of these tools in providing accurate representations of glitches, especially in higher dimensions (3D).There is an ongoing dialogue about the need for improved navigation and management tools within the Zooniverse platform to handle large datasets more efficiently, particularly for sorting and identifying duplicates in glitch classifications. This includes suggestions for enhancements that would allow easier deletion or categorization of glitches directly from the user interface.
 # 4. Consider multiple prompts for multiple purposes, and whether they should be automated
 #####################################################################################################
+#####################################################################################################
 def ligo_prompt(talk_dat0, talk_dat1):
     # Required: provide a user prompt variable which takes the text data
     user_prompt = f"""
@@ -65,30 +66,7 @@ def ligo_prompt(talk_dat0, talk_dat1):
     
     Citizen scientists also attempt to identify underlying causes of each glitch. The forum data captures the evolving nature of glitch classification, the needs for new classifications, and novel exploration of glitch origins and characteristics by citizen scientists and researchers. The forum data emerges as a part of significant curiosity and engagement with the data, with the need for a clear summary.
 
-These are the glitch classes we know about. These are not new, however there might be important conversations about their underlying causes:
-    - 1080 Line 
-    - 1400 Ripple 
-    - 70 Hz Line 
-    - Air Compressor (50 Hz)
-    - Blip 
-    - Chirp 
-    - Crown 
-    - Extremely Loud
-    - Helix 
-    - Koi Fish 
-    - Low-Frequency Line 
-    - No Glitch 
-    - Paired Doves 
-    - Pizzicato 
-    - Power Line (60 Hz) 
-    - Repeating Blips 
-    - Scattered Light 
-    - Scratchy 
-    - Tomte 
-    - Uncategorized_Glitches 
-    - Violin Mode Harmonic 
-    - Wandering Line 
-    - Whistle
+    Within the Zooniverse project Gravity Spy, there are existing well-defined glitch classifications that describe transient noise artifacts seen in data from LIGO's gravitational wave detectors. Use the existing list of glitches as context for the following data
 
     Consider "last week's" forum data:
     {talk_dat0}
@@ -120,31 +98,31 @@ These are the glitch classes we know about. These are not new, however there mig
     return user_prompt, sys_prompt
 
 
-# THIS PROMPT IS STILL A BETA DESIGN, DO NOT RUN YET.
-
 def alog_prompt(alog_dat0, alog_dat1):
     # Required: provide a user prompt variable which takes the text data
     user_prompt = f"""
-    The following forum data are from LIGO affiliated scientists and engineers. LIGO affiliates often use LIGO's LVC Abbreviations and Acronyms, and so you will need to use them to interpret the discussions. The data involve discussions surrounding LIGO laboratory equiptment. The data originally were in a dataframe of two columns. The first column was the "comment" text and the second was the "URL" affiliated with the comment. After each comment has been formatted such that it is followed by its URL.
+    The data involve discussions surrounding LIGO laboratory equiptment. The data originally were in a dataframe of two columns. The first column was the "comment" text and the second was the "URL" affiliated with the comment. After each comment has been formatted such that it is followed by its URL. Format all URLs without hashtags following this format: [75875](https://alog.ligo-la.caltech.edu/aLOG/index.php?callRep=75875). I.e. make the hyperlink text the relevant comment ID.
 
-    Many of the acronyms relate to channels in LIGO sensors or other processes surrounding LIGO.
+    Many of the acronyms relate to channels in LIGO sensors or other processes surrounding LIGO. Translate these acronyms to full words from the LIGO Abbreviations and Acronyms list.
 
-    Consider ALOG Dataset 1:
+    Consider aLOG Dataset 1:
     {alog_dat0}
 
-    Now consider ALOG Dataset 2:
+    Now consider aLOG Dataset 2:
     {alog_dat1}
 
-    Provide responses for some the specific kinds of activities that are different for ALOG Dataset 2 relative to Dataset 1.
+    Provide responses for some the specific kinds of activities that are different for aLOG Dataset 2 relative to Dataset 1.
     
-    1. Are there unresolved issues related to particular sensors? What are they? For each unresolved issue, provide a bullet. Also provide a sentence or two explaining each issue in pedestrian language. Please provide the URL that references back to the relevant ALOG conversation.
+    1. Are there unresolved issues related to particular sensors that may cause a glitch in the gravitational wave data? What are these issues? For each unresolved issue, provide a bullet. Also provide a sentence or two explaining each issue in simple language. Please provide the URL that references back to the relevant aLOG conversation.
 
-    2. Were there alterations to particular sensors? For each unresolved issue, provide a bullet and a sentence or two explaining each issue in pedestrian language. Provide the URLs that reference back ot the relevant ALOG conversation.
+    2. Were there alterations to particular sensors? For each unresolved issue, provide a bullet and a sentence or two explaining each issue in pedestrian language. Provide the URLs that reference back ot the relevant aLOG conversation.
+
+    3. Where there external events, such as enviornemental issues that were not about sensor failures or modifications that might be related to glitches in gravitational wave data? For each event, provide a bullet and a sentence or two explaining each issue in pedestrian language. Provide the URLs that reference back ot the relevant aLOG conversation.
     """
 
     # Optional: provide a system prompt which tells the bot the context it is responding to.
     sys_prompt = f"""
-    You are a interpreting engineers and physicists conversations surrounding the LIGO laboratories. You are helping a group of citizen scientists understand what is happening at the laboratory such that they can interpret Gravity Spy Glitch issues as quickly as possible. You are providing a summary in plain language that a citizen scientist might understand.
+    You are a LIGO scientist tasked with summarizing aLOG conversations for citizen scientists. The important conversations are about relevant engineering changes or events which may create glitches in gravitational wave data. Your goal is to help citizen scientists understand laboratory issues that will enable them to interpret Gravity Spy Glitch issues quickly. Use clear, simple language and avoid technical jargon to ensure accessibility. Translate acronyms to full words based upon LIGO Abbreviations and Acronyms whenever possible.  Structure the summary logically, highlighting common or recent issues, and maintain a neutral, informative tone.  Format all relevant hyperlinks without hashtags following this format:  [75875](https://alog.ligo-la.caltech.edu/aLOG/index.php?callRep=75875)
     """
 
     # Required: return user_prompt and all other variables created as inputs for the bot.

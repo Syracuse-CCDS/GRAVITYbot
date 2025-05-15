@@ -53,9 +53,9 @@ def start_end_dates():
     # Today's date
     current_date = datetime.now(timezone.utc)
 
-    talk_dat1_start = current_date - timedelta(days=3)
+    talk_dat1_start = current_date - timedelta(days=4)
     talk_dat0_end = talk_dat1_start - timedelta(days=1)
-    talk_dat0_start = talk_dat0_end - timedelta(days=3)
+    talk_dat0_start = talk_dat0_end - timedelta(days=4)
 
     # Convert all the dates to strings formatted as the Talk file name conventions.
     talk_dat1_start = talk_dat1_start.strftime('%Y-%m-%d')
