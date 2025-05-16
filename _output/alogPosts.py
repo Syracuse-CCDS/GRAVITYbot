@@ -19,8 +19,7 @@ username = os.environ.get("PANOPTES_USER")
 password = os.environ.get("PANOPTES_PASS")
 user_id = os.environ.get("PANOPTES_ID") #os.environ.get("PANOPTES_USER")
 #####################################################################################################
-
-def alog_discussion_post(current_day, username=username, password=password, user_id=user_id):
+def alog_board_post(current_day, username=username, password=password):
 
     Panoptes.connect(username=username, password=password)
 
@@ -28,7 +27,7 @@ def alog_discussion_post(current_day, username=username, password=password, user
     talk = Talk()
     # This needs to be generated and updated to whatever the discussion ID is, 
     # It is at the end of the URL of the discussion post
-    discussion_id = 3633195
+    board_id = 6872
 
     # Formatting message to post
     # This needs to be updated so that it finds the current file
@@ -42,9 +41,12 @@ def alog_discussion_post(current_day, username=username, password=password, user
         try:
             with open(f'_output/{l}aLogForumSummary_{current_day}.md', 'r', encoding='utf-8') as file:
                 alog_sum = file.readlines()
+            
+            discussion_title = f'{l} aLOG Summary: {current_day}\n'
 
             # Modify the content as needed
             # For example, add a new header
+
             alog_sum.insert(0, f'## {l} aLOG Summary: {current_day}\n')
 
             alog_sum = ''.join(alog_sum)
@@ -53,12 +55,12 @@ def alog_discussion_post(current_day, username=username, password=password, user
             body = alog_sum
 
             # Sending the message body to the discussion_id location
-            payload = { 'comments': {
-                                    'user_id': user_id, 'discussion_id': discussion_id, 'body': body
-                        }}
+            payload = {"discussions": {
+                "title":discussion_title, "board_id":board_id, "comments":[{"body":body}]
+                }}
 
             # Posting the message
-            talk.http_post('comments', json=payload)
+            talk.http_post('discussions', json=payload)
         
         except:
             print(f'There is no {l} aLOG file affiliated with {current_day}.')

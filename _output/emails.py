@@ -22,7 +22,6 @@ def talk_email(date, body):
     subject = "GRAVITYbot Talk Summary: " + date
     md_body = body
     
-    #print(body)
     # TO-DO: Format email here
 
     return subject, md_body

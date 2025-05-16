@@ -168,7 +168,7 @@ def chat_with_gpt4(user_prompt, sys_prompt):
             ],
         model="gpt-4-turbo",                            # The openAI model for the project
         temperature=    0.8,                            # Lower = more flexibility, Higher = more accurate
-        max_tokens=     4000                            # NOTICE: higher tokens, more money.
+        max_tokens=     4096                            # NOTICE: higher tokens, more money.
     )
 
     # Outfile of Call and Response to GravitySpy
@@ -235,7 +235,7 @@ def main():
             lhoBotResp.close()
     except:
         print("WARNING: No LHO aLOG Summary file saved.")
-    alogPosts.alog_discussion_post(current_day)
+    alogPosts.alog_board_post(current_day)
 
     print("------------------")
     print("Ending ALOG Summary...")
