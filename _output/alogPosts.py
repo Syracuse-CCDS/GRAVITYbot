@@ -27,7 +27,7 @@ def alog_board_post(current_day, username=username, password=password):
     talk = Talk()
     # This needs to be generated and updated to whatever the discussion ID is, 
     # It is at the end of the URL of the discussion post
-    board_id = 6872
+    board_id = 6945
 
     # Formatting message to post
     # This needs to be updated so that it finds the current file
