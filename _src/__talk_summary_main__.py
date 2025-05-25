@@ -2,7 +2,7 @@
 # DOCUMENTATION NOTES : #############################################################################
 # File Creator: Alexander O. Smith (2024-present), aosmith@syr.edu
 # Current Maintainer: Alexander O. Smith, aosmith@syr.edu
-# Last Update: April 2, 2025
+# Last Update: May 25, 2025
 # Program Goal:
 # This file is the main talk summary executable Python file of "GRAVITYbot"
 #####################################################################################################
@@ -40,11 +40,11 @@ def print(*args, **kwargs):
 #####################################################################################################
 # Functions #########################################################################################
 # 0. start_end_dates    :   produces two adjacent weeks spans
-# 1. load_talk          :   loads talk data
+# 1. clean_comments     :   regex cleaning of comments 
+# 1. load_talk          :   loads and cleans talk data
 # 2. segment_by_time    :   limits talk data to those within particular dates
 
-
-# Produces start and end dates for the most recent two weeks of Talk data.
+# Function: Produces start and end dates for the most recent two weeks of Talk data.
 def start_end_dates():
     print('Loading the most recent Talk forum data...')
     # Today's date
@@ -101,6 +101,8 @@ TROUBLESHOOTING SUGGESTIONS:
         'talk_dat0_start'   :   talk_dat0_start, 
         'talk_dat0_end'     :   talk_dat0_end 
     }
+
+# Function: Adds all regex cleaning for talk into a single function
 def clean_comments(text):
     text = re.sub('This comment has been deleted', '', text)
     text = re.sub(r'https.*\s', ' ', text)
@@ -167,6 +169,7 @@ def segment_by_time(text_dat, start_date, end_date):
     
     return gpt_talk_str
 
+# Function: Calls GPT-4 Turbo
 def chat_with_gpt4(user_prompt, sys_prompt):
     _ = load_dotenv(find_dotenv())
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY")) 
