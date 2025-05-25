@@ -101,68 +101,57 @@ TROUBLESHOOTING SUGGESTIONS:
         'talk_dat0_start'   :   talk_dat0_start, 
         'talk_dat0_end'     :   talk_dat0_end 
     }
+def clean_comments(text):
+    # If text is missing or not a string, return empty string (or handle as you like)
+    text = re.sub('This comment has been deleted', '', text)
+    text = re.sub(r'https.*\s', ' ', text)
+    text = re.sub(r'@\w+', ' ', text)
+    text = re.sub(r'Hi,\n|Hello,\n', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'Thanks|Thank you', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'[^A-Za-z0-9\>\s\'\"\?\.\!]', ' ', text)
+    text = re.sub(r'\.+', ' ', text)
+    text = re.sub('projects zooniverse gravity spy talk subjects', ' ', text)
+    text = re.sub('zooniverse gravity spy talk comment page', ' ', text)
+    text = re.sub(r'\s[b-z][\.\s]', ' ', text)
+    text = re.sub(r'^v$', '', text)
+    text = re.sub(r'[\n]', ' ', text)
+    text = re.sub(r'[0-9]+\s', ' ', text)
+    text = re.sub(r'[a-z][0-9]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 # Function: loads Talk data and gets comments which contain text
 def load_talk(file_path):
     talk_url = 'https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk/'
 
-    with open(file_path, encoding='utf-8') as file:
-        reader = csv.DictReader(file)
-        # Define the Universal timezone
-        utc = pytz.UTC
-
-        # Set up lists for dataframe return
-        txt         =   []
-        times       =   []
-        comment_urls=   []
-
-        for row in reader:
-            # Define time formats with and without microseconds
-            fmt_dot_ms = '%Y-%m-%d %H:%M:%S.%f%z'
-            fmt_wo_ms = '%Y-%m-%d %H:%M:%S%z'
-            
-            # Timestamp Data Clean
-            timestamp = row['comment_created_at']
-            try:
-                # Parse the timestamp
-                time = datetime.strptime(timestamp, fmt_dot_ms).astimezone(utc)
-            except ValueError:
-                time = datetime.strptime(timestamp, fmt_wo_ms).astimezone(utc)
-            
-            times.append(time)            
-           
-            # Text cleaning (saves monpathey and makes it easier to not rate limit)
-            text = row['comment_body']  
-            text = re.sub('This comment has been deleted', '', text)
-            text = re.sub(r'https.*\s', ' ', text)
-            text = re.sub(r'@\w+', ' ', text)
-            text = re.sub(r'Hi,\n|Hello,\n', '' , text, re.IGNORECASE)
-            text = re.sub(r'Thanks|Thank you', '', text, re.IGNORECASE)
-            text = re.sub(r'[^A-Za-z0-9\>\s\'\"\?\.\!]', ' ', text)
-            text = re.sub(r'\.+', ' ', text)
-            text = re.sub('projects zooniverse gravity spy talk subjects', ' ', text)
-            text = re.sub('zooniverse gravity spy talk comment page', ' ', text)
-            text = re.sub(r'\s[b-z][\.\s]', ' ', text)
-            text = re.sub(r'^v$', '' ,text)
-            text = re.sub(r'[\n]', ' ', text)
-            text = re.sub(r'[0-9]+\s', ' ', text)
-            text = re.sub(r'[a-z][0-9]+', ' ', text)
-            text = re.sub(r'\s+', ' ', text)
-            txt.append(text)
-            # Building Comment URLs to "cite" when GRAVITYbot needs to reference a comment
-            board = str(row['board_id'])+'/'
-            disc_id = str(row['discussion_id'])+'/'
-            comment_url = talk_url+board+disc_id
-            comment_urls.append(comment_url)
+    # Probably rewrite with pandas to be a little more straightforward...
+    #with open(file_path, encoding='utf-8') as file:
+    #    reader = csv.DictReader(file)
+    #    reader
+    reader = pd.read_csv(file_path, encoding='utf8')
+    
+    # Drop rows with board_ids associated with GRAVITYbot: 6872, 6946, 6945
+    # NOTICE: these board_ids will need to be updated for new projects
+    drop = [6872, 6946, 6945] # This will reduce the risk of circular summaries
+    # drop all rows with these board_ids
+    reader = reader[reader.board_id.isin(drop) == False]
+        
+    # Define the Universal timezone
+    utc = pytz.UTC
 
 
+    timestamp = reader['comment_created_at']
+    times = pd.to_datetime(timestamp, utc=True, format='mixed', errors='raise')
+    comment_urls =  reader.apply(
+        lambda row: f"{talk_url}{row['board_id']}/{row['discussion_id']}", axis=1)
+    text = reader['comment_body'].fillna('').apply(clean_comments)
 
-        # Generate DataFrame of data necessary for GRAVITYbot interpretation
-        text_dat = pd.DataFrame({
-            'timestamp'     : times,
-            'comment'       : txt,
-            'comment_url'   : comment_urls,
-        })
+    # Generate DataFrame of data necessary for GRAVITYbot interpretation
+    text_dat = pd.DataFrame({
+        'timestamp'     : times,
+        'comment'       : text,
+        'comment_url'   : comment_urls,
+    })
 
     return text_dat
 
