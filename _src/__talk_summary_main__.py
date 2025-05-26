@@ -128,12 +128,19 @@ def load_talk(file_path):
     # Import CSV of Talk as Pandas DataFrame
     reader = pd.read_csv(file_path, encoding='utf8')
     
+    # NOTICE: gb_id is GRAVITYbot's user_id. We remove affiliated rows that match comment_user_id to reduce circularity in summaries
+    _ = load_dotenv(find_dotenv())
+    gb_id = os.environ.get("PANOPTES_ID")
+
+    # NOTICE: these could be added to the dotenv file to automate them rather than hardcode them
     # Drop rows with board_ids associated with GRAVITYbot: 6872, 6946, 6945
-    # NOTICE: these board_ids will need to be updated for new projects
-    drop = [6872, 6946, 6945] # This will reduce the risk of circular summaries
+    drop_board = [6872] # This will reduce the risk of circular summaries
     # drop all rows with these board_ids
-    reader = reader[reader.board_id.isin(drop) == False]
-        
+    reader = reader[reader.board_id.isin(drop_board) == False]
+    # Drop GRAVITYbot User_id
+    drop_gb = [gb_id]
+    reader = reader[reader.comment_user_id.isin(drop_gb) == False]
+
     # Define the Universal timezone
     utc = pytz.UTC
 
