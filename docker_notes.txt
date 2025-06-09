@@ -17,3 +17,7 @@ docker run -it --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravi
 sudo docker run -it --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__talk_summary_main__.py 
 sudo crontab -e
     0 19 * * 1 /opt/GRAVITYbot/talk_summary.sh
+
+# test job
+sudo crontab -e
+    * * * * * /opt/GRAVITYbot/cron_test.sh
