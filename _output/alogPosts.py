@@ -9,7 +9,7 @@
 #####################################################################################################
 # DEPENDENCIES ######################################################################################
 # Package Dependencies
-import os, sys, requests, markdown, markdownify
+import os, sys, re, requests, markdown, markdownify
 from dotenv import find_dotenv, load_dotenv
 from panoptes_client.panoptes import Talk, Panoptes
 #####################################################################################################
@@ -38,30 +38,26 @@ def alog_board_post(current_day, username=username, password=password):
     # Read the Markdown file
     labs = ['LLO', 'LHO']
     for l in labs:
-        try:
-            with open(f'_output/{l}aLogForumSummary_{current_day}.md', 'r', encoding='utf-8') as file:
-                alog_sum = file.readlines()
-            
-            discussion_title = f'{l} aLOG Summary: {current_day}\n'
-
-            # Modify the content as needed
-            # For example, add a new header
-
-            alog_sum.insert(0, f'## {l} aLOG Summary: {current_day}\n')
-            alog_sum = ''.join(alog_sum)+'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
-            # Final message
-            body = alog_sum
-
-            # Sending the message body to the discussion_id location
-            payload = {"discussions": {
-                "title":discussion_title, "board_id":board_id, "comments":[{"body":body}]
-                }}
-
-            # Posting the message
-            talk.http_post('discussions', json=payload)
+        #try:
+        with open(f'_output/{l}aLogForumSummary_{current_day}.md', 'r', encoding='utf-8') as file:
+            alog_sum = file.readlines()
         
-        except:
-            print(f'There is no {l} aLOG file affiliated with {current_day}.')
+        discussion_title = f'{l} aLOG Summary: {current_day}\n'
+
+        alog_sum.insert(0, f'## {l} aLOG Summary: {current_day}\n')
+        alog_sum = ''.join(alog_sum)+r'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
+        alog_sum = re.sub(r'https://', r'+tab+https://', alog_sum)
+
+        # Final message
+        body = alog_sum
+
+        # Sending the message body to the discussion_id location
+        payload = {"discussions": {
+            "title":discussion_title, "board_id":board_id, "comments":[{"body":body}]
+            }}
+
+        # Posting the message
+        talk.http_post('discussions', json=payload)
 
 
 #####################################################################################################
