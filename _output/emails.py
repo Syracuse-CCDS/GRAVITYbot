@@ -15,26 +15,28 @@
 # Package Dependencies
 from dotenv import find_dotenv, load_dotenv     # Loading env file
 from panoptes_client.panoptes import Talk, Panoptes
-import os, smtplib, ssl                         # OS and server/mail protocol libraries
+import os, smtplib, ssl, markdown               # OS and server/mail protocol libraries
 from email.mime.text import MIMEText            # Email Formatting
-# Getting dotenv credentials necessary to send the message.
+from email.mime.multipart import MIMEMultipart
+from email.message import EmailMessage
 
+# Getting dotenv credentials necessary to send the message.
 _ = load_dotenv(find_dotenv())
 username = os.environ.get("PANOPTES_USER")
 password = os.environ.get("PANOPTES_PASS")
 user_id = os.environ.get("PANOPTES_ID") #os.environ.get("PANOPTES_USER")
 
-def talk_email(date, body):
+def talk_email(date):
     # Email Subject/Body "Hello There" Email Test
     subject = "GRAVITYbot Talk Summary: " + date
-    md_body = body
-    
-    # TO-DO: Format email here
+    with open(f"./_output/ZooniverseTalkSummary_{date}.md", "r") as md:
+        text = md.read()
+        html = markdown.markdown(text, extensions=['fenced_code', 'codehilite', 'extra', 'sane_lists', 'nl2br'])
 
-    return subject, md_body
+    return subject, html, text
 
 # A function that sends email
-def send_email(subject, body):
+def send_email(subject, html, text):
     # Loading the necessary info for the email from env file
     _ = load_dotenv(find_dotenv())
     SMTP_PORT = 587
@@ -44,13 +46,15 @@ def send_email(subject, body):
     MSG_FROM = os.environ.get("SMTP_FROM")
     MSG_TO = os.environ.get("SMTP_TO")
     # Making Message Variables
-    MSG_BODY = body
+    MSG_BODY = html
     MSG_SUBJECT = subject
 
-    msg = MIMEText(MSG_BODY,  'plain')
+    msg = EmailMessage()
     msg['Subject'] = MSG_SUBJECT
     msg['From'] = MSG_FROM
     msg['To'] = MSG_TO
+    msg.set_content(text)  # plain text fallback
+    msg.add_alternative(html, subtype='html')
     
     server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
     server.starttls()
@@ -67,7 +71,6 @@ def talk_board_post(current_day, username=username, password=password):
     # This needs to be generated and updated to whatever the discussion ID is, 
     # It is at the end of the URL of the discussion post
     board_id = 6946
-
 
     # Read the Markdown file
     with open(f'_output/ZooniverseTalkSummary_{current_day}.md', 'r', encoding='utf-8') as file:
@@ -93,11 +96,8 @@ def talk_board_post(current_day, username=username, password=password):
     # Posting the message
     talk.http_post('discussions', json=payload)
 
-
-
 def main(date, body):
-    email = talk_email(date, body)
-    #send = send_email(email[0], email[1])
+    email = talk_email(date)
+    send = send_email(email[0], email[1], email[2])
     talk_post = talk_board_post(date)
 
-# To Do: #############################################################################################
