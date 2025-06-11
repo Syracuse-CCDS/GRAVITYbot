@@ -48,7 +48,7 @@ def print(*args, **kwargs):
 ## WARNING: This function will need to be rewritten to work explicitly on alog data instead.
 # Produces start and end dates for the most recent two weeks of Talk data.
 def start_end_dates():
-    print('Loading the most recent ALOG forum data...')
+    print('Loading the most recent aLOG forum data...')
     
     # Today's date
     current_date = datetime.now(timezone.utc)
@@ -182,12 +182,12 @@ def chat_with_gpt4(user_prompt, sys_prompt):
 # Main Function: Calls all previous functions for a user specified time frame
 def main():
     print("------------------")
-    print("Starting ALOG Summary...")
+    print("Starting aLOG Summary...")
     print("------------------")
 
-    # Retrieve most updated alog data
+    # Retrieve most updated aLOG data
     alogdata = alog.main()
-    print("LIGO Alog Forum Data Request Complete")
+    print("LIGO aLOG Forum Data Request Complete")
     # Get the most recent csv name, and the start and end dates for the most recent two weeks.     
     time_deltas = start_end_dates()
 
@@ -204,20 +204,20 @@ def main():
     llo_load = alogload[alogload['rss'] == llo_alog]
 
     # Call segment_by_time function using the automated start-end days.
-    lho_dat0 = segment_by_time(lho_load, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # Alog Older week
-    lho_dat1 = segment_by_time(lho_load, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # Alog Newer week
+    lho_dat0 = segment_by_time(lho_load, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # aLOG Older week
+    lho_dat1 = segment_by_time(lho_load, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # aLOG Newer week
     print(f'LHO: first dataset is {str(len(lho_dat0))} strings long and the second is {str(len(lho_dat1))}.')
 
-    llo_dat0 = segment_by_time(llo_load, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # Alog Older week
-    llo_dat1 = segment_by_time(llo_load, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # Alog Newer week
+    llo_dat0 = segment_by_time(llo_load, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # aLOG Older week
+    llo_dat1 = segment_by_time(llo_load, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # aLOG Newer week
     print(f'LLO: first dataset is {str(len(llo_dat0))} strings long and the second is {str(len(llo_dat1))}.')
 
     # Call ex_func_prompt_gen from prompts.py 
     llo_prompt = prompts.alog_prompt(llo_dat0, llo_dat1)
     lho_prompt = prompts.alog_prompt(lho_dat0, lho_dat1)
 
-    print("Summarizing Alogs")
-    # Call chatGPT function for ALOG Forum summaries and save them to MD files
+    print("Summarizing aLOGs")
+    # Call chatGPT function for aLOG Forum summaries and save them to MD files
     current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     try:
         lloBot = chat_with_gpt4(llo_prompt[0], llo_prompt[1])
@@ -236,7 +236,7 @@ def main():
     alogPosts.alog_board_post(current_day)
 
     print("------------------")
-    print("Ending ALOG Summary...")
+    print("Ending aLOG Summary...")
     print("------------------")
 
 gsBotResponse = main()
