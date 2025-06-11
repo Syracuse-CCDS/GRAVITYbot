@@ -48,9 +48,7 @@ def alog_board_post(current_day, username=username, password=password):
             # For example, add a new header
 
             alog_sum.insert(0, f'## {l} aLOG Summary: {current_day}\n')
-
-            alog_sum = ''.join(alog_sum)
-
+            alog_sum = ''.join(alog_sum)+'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
             # Final message
             body = alog_sum
 
