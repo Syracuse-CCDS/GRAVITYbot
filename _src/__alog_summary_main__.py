@@ -116,8 +116,6 @@ def load_alog(file_path):
             text = re.sub(r'\s[b-z][\.\s]', ' ', text)
             text = re.sub(r'^v$', '' ,text)
             text = re.sub(r'[\n]', ' ', text)
-            text = re.sub(r'[0-9]+\s', ' ', text)
-            text = re.sub(r'[a-z][0-9]+', ' ', text)
             text = re.sub(r'\s+', ' ', text)
             txt.append(text)
             #print(txt[0:10])
