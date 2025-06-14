@@ -2,7 +2,7 @@
 # DOCUMENTATION NOTES : #############################################################################
 # File Creator: Alexander O. Smith (2025-present), aosmith@syr.edu
 # Current Maintainer: Alexander O. Smith, aosmith@syr.edu
-# Last Update: April 2, 2025
+# Last Update: June 14, 2025
 # Program Goal:
 # This file posts the aLOG summary "GRAVITYbot"
 #####################################################################################################
@@ -29,12 +29,6 @@ def alog_board_post(current_day, username=username, password=password):
     # It is at the end of the URL of the discussion post
     board_id = 6945
 
-    # Formatting message to post
-    # This needs to be updated so that it finds the current file
-    #f = open('_output/LLOaLogForumSummary_2025-04-01.md', 'r')
-    #html_gpt = markdown.markdown( f.read() )
-    #markdown_string = markdownify.markdownify(html_gpt)
-
     # Read the Markdown file
     labs = ['LLO', 'LHO']
     for l in labs:
@@ -45,7 +39,7 @@ def alog_board_post(current_day, username=username, password=password):
         discussion_title = f'{l} aLOG Summary: {current_day}\n'
 
         alog_sum.insert(0, f'## {l} aLOG Summary: {current_day}\n')
-        alog_sum = ''.join(alog_sum)+r'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
+        alog_sum = ''.join(alog_sum)+'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
         alog_sum = re.sub(r'https://', r'+tab+https://', alog_sum)
 
         # Final message
