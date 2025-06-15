@@ -213,8 +213,8 @@ def main():
     print(f'LLO: first dataset is {str(len(llo_dat0))} strings long and the second is {str(len(llo_dat1))}.')
 
     # Call ex_func_prompt_gen from prompts.py 
-    llo_prompt = prompts.alog_prompt(llo_dat0, llo_dat1)
-    lho_prompt = prompts.alog_prompt(lho_dat0, lho_dat1)
+    llo_prompt = prompts.alog_prompt(llo_dat0, llo_dat1, "LLO: ")
+    lho_prompt = prompts.alog_prompt(lho_dat0, lho_dat1, "LHO: ")
 
     print("Summarizing aLOGs")
     # Call chatGPT function for aLOG Forum summaries and save them to MD files
