@@ -83,7 +83,7 @@ def talk_board_post(current_day, username=username, password=password):
 
     talk_sum.insert(0, f'## Talk Summary: {current_day}\n')
 
-    talk_sum = ''.join(talk_sum) +'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
+    talk_sum = ''.join(talk_sum) +'\n\n NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers and is under construction and is subject to updates in training. Full documentation and development can be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns, questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.'
 
     # Final message
     body = talk_sum
