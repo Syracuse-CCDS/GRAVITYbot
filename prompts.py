@@ -2,7 +2,7 @@
 # DOCUMENTATION NOTES : #############################################################################
 # File Author: Alexander O. Smith, aosmith@syr.edu
 # Current Maintainer: Alexander O. Smith, aosmith@syr.edu
-# Last Update: May 26, 2024
+# Last Update: June 21, 2025
 # Program Goal:
 # This file is dedicated to creating prompt variables and functions for chatGPT
 #####################################################################################################
