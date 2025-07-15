@@ -98,5 +98,5 @@ def talk_board_post(current_day, username=username, password=password):
 
 def main(date, body):
     email = talk_email(date)
-    #send = send_email(email[0], email[1], email[2])
-    #talk_post = talk_board_post(date)
+    send = send_email(email[0], email[1], email[2])
+    talk_post = talk_board_post(date)
