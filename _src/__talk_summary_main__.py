@@ -40,7 +40,7 @@ def print(*args, **kwargs):
 #####################################################################################################
 # Functions #########################################################################################
 # 0. start_end_dates    :   produces two adjacent weeks spans
-# 1. clean_comments     :   regex cleaning of comments 
+# 1. clean_comments     :   regex cleaning of comments
 # 1. load_talk          :   loads and cleans talk data
 # 2. segment_by_time    :   limits talk data to those within particular dates
 
@@ -59,7 +59,7 @@ def start_end_dates():
         talk_dat1_start = current_date - timedelta(days=7)
         talk_dat0_end = talk_dat1_start - timedelta(days=1)
         talk_dat0_start = talk_dat0_end - timedelta(days=7)
-        
+
         # Convert all the dates to strings formatted as the Talk file name conventions.
         talk_dat1_start = talk_dat1_start.strftime('%Y-%m-%d')
         talk_dat0_end = talk_dat0_end.strftime('%Y-%m-%d')
@@ -74,7 +74,7 @@ def start_end_dates():
                 talk_file = f
                 print(
                 f"""
-NOTICE: Talk file "{talk_file}" found! 
+NOTICE: Talk file "{talk_file}" found!
     Generating date range for summary...\n
                 """
                 )
@@ -95,11 +95,11 @@ TROUBLESHOOTING SUGGESTIONS:
         current_date -= timedelta(days=1)
 
     return {
-        'talk_file'         :   talk_file, 
-        'talk_dat1_start'   :   talk_dat1_start, 
-        'talk_dat1_end'     :   talk_dat1_end, 
-        'talk_dat0_start'   :   talk_dat0_start, 
-        'talk_dat0_end'     :   talk_dat0_end 
+        'talk_file'         :   talk_file,
+        'talk_dat1_start'   :   talk_dat1_start,
+        'talk_dat1_end'     :   talk_dat1_end,
+        'talk_dat0_start'   :   talk_dat0_start,
+        'talk_dat0_end'     :   talk_dat0_end
     }
 
 # Function: Adds all regex cleaning for talk into a single function
@@ -127,7 +127,7 @@ def load_talk(file_path):
 
     # Import CSV of Talk as Pandas DataFrame
     reader = pd.read_csv(file_path, encoding='utf8')
-    
+
     # NOTICE: gb_id is GRAVITYbot's user_id. We remove affiliated rows that match comment_user_id to reduce circularity in summaries
     _ = load_dotenv(find_dotenv())
     gb_id = os.environ.get("PANOPTES_ID")
@@ -138,7 +138,10 @@ def load_talk(file_path):
     # drop all rows with these board_ids
     reader = reader[reader.board_id.isin(drop_board) == False]
     # Drop GRAVITYbot User_id
-    drop_gb = [gb_id]
+    # WEIRD ISSUE HERE: so my idea here was I can always just pull the ID that GRAVITYbot
+    # is assigned to, and drop that ID dynamically. But for some reason, when I did that,
+    # it ONLY summarized GRAVITYbot. So I re-hardcoded it for now.
+    drop_gb = [2877652] #gb_id]
     reader = reader[reader.comment_user_id.isin(drop_gb) == False]
 
     # Define the Universal timezone
@@ -173,18 +176,18 @@ def segment_by_time(text_dat, start_date, end_date):
     gpt_talk_reduce = talk_dat[['comment', 'comment_url']]
     gpt_talk_str = gpt_talk_reduce.to_string(header = False, index = False)
     gpt_talk_str = re.sub(r'\s+', ' ', gpt_talk_str)
-    
+
     return gpt_talk_str
 
 # Function: Calls GPT-4 Turbo
 def chat_with_gpt4(user_prompt, sys_prompt):
     _ = load_dotenv(find_dotenv())
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY")) 
-    
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
     response = client.chat.completions.create(
         # Messages: priming the model for a response
         messages = [
-            
+
             {'role' : 'system', 'content' : sys_prompt},# System "role" in which openAI responds
             {'role': 'user', 'content': user_prompt}    # What "I" am asking/telling the model
             ],
@@ -210,8 +213,8 @@ def main():
     # Get Talk Data from Panoptes API
     talkdata = talk_data.main()
     print("GravitySpy Talk Forum Data Request Complete")
-    
-    # Get the most recent csv name, and the start and end dates for the most recent two weeks.     
+
+    # Get the most recent csv name, and the start and end dates for the most recent two weeks.
     time_deltas = start_end_dates()
 
     # Load Gravity Spy Talk data file
@@ -220,10 +223,10 @@ def main():
     # Call segment_by_time function using the automated start-end days.
     talk_dat0 = segment_by_time(talkload, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # Talk Older week
     talk_dat1 = segment_by_time(talkload, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # Talk Newer week
-    
+
     current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
-    # Call ex_func_prompt_gen from prompts.py 
+    # Call ex_func_prompt_gen from prompts.py
     talk_prompt = prompts.ligo_prompt(talk_dat0, talk_dat1)
 
     # Call chatGPT function for Zooniverse Talk summary

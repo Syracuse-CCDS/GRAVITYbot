@@ -6,7 +6,7 @@
 # Program Goal:
 # This file sends emails and automates posts to forums that are returned from GRAVITYbot summaries.
 #####################################################################################################
-# NOTICE: 
+# NOTICE:
 # 1. For this functionality to work, you need to get an Google App password and add all the proper
 # GOOGLE_APP_XXX variables in the dotenv file.
 # 2. You will need to make sure that the "recipients" email(s) will accept email from the "sender."
@@ -55,7 +55,7 @@ def send_email(subject, html, text):
     msg['To'] = MSG_TO
     msg.set_content(text)  # plain text fallback
     msg.add_alternative(html, subtype='html')
-    
+
     server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
     server.starttls()
     server.login(SMTP_USER, SMTP_PASSWORD)
@@ -66,16 +66,16 @@ def talk_board_post(current_day, username=username, password=password):
 
     Panoptes.connect(username=username, password=password)
 
-    # Build the message 
+    # Build the message
     talk = Talk()
-    # This needs to be generated and updated to whatever the discussion ID is, 
+    # This needs to be generated and updated to whatever the discussion ID is,
     # It is at the end of the URL of the discussion post
     board_id = 6946
 
     # Read the Markdown file
     with open(f'_output/ZooniverseTalkSummary_{current_day}.md', 'r', encoding='utf-8') as file:
         talk_sum = file.readlines()
-    
+
     discussion_title = f'Gravity Spy Talk Summary: {current_day}\n'
 
     # Modify the content as needed
@@ -98,6 +98,5 @@ def talk_board_post(current_day, username=username, password=password):
 
 def main(date, body):
     email = talk_email(date)
-    send = send_email(email[0], email[1], email[2])
-    talk_post = talk_board_post(date)
-
+    #send = send_email(email[0], email[1], email[2])
+    #talk_post = talk_board_post(date)
