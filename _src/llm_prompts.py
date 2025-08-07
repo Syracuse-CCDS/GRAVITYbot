@@ -117,7 +117,7 @@ When data is provided, you should expect to be delimited by lines consisting
 only of spaces and '{DATA_DELIMITER}'.
 
 When generating summaries, Format all URLs without hashtags following this format:
-[{template_link_text}]({template_link_url}).
+[{template_link_text}](+tab+{template_link_url}).
 
 Structure the summary logically, highlighting common or recent issues, and
 maintain a neutral, informative tone. Phrase interpretations with rhetoric like

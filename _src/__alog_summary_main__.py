@@ -8,7 +8,7 @@ Author: Alexander O. Smith (2024–present)
 Maintainer: Alexander O. Smith <aosmith@syr.edu>
 """
 
-# Standard Library
+# Standard Libraries
 import csv
 import datetime
 import os
@@ -91,7 +91,7 @@ def clean_comment_text(text):
 
     Returns:
         str: The cleaned and normalized comment text.
-    
+
     Behavior:
         - Removes URLs starting with 'https' up to the next whitespace.
         - Removes Twitter-style mentions (e.g., @username).
@@ -375,7 +375,7 @@ if __name__ == "__main__":
 
     ## ----------------------
     ## Establish pathing to data and output folders
-    ## This should likely be done via the config 
+    ## This should likely be done via the config
     ## ----------------------
     script_path = pathlib.Path(__file__).resolve()
     project_root_folder = script_path.parent.parent
