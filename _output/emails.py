@@ -30,7 +30,7 @@ def talk_email(date):
     # Email Subject/Body "Hello There" Email Test
     subject = "GRAVITYbot Talk Summary: " + date
     with open(f"./_output/ZooniverseTalkSummary_{date}.md", "r") as md:
-        text = md.read()
+        text = md.read().replace("+tab+", "")
         html = markdown.markdown(text, extensions=['fenced_code', 'codehilite', 'extra', 'sane_lists', 'nl2br'])
 
     return subject, html, text
