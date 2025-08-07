@@ -218,7 +218,7 @@ def main():
     time_deltas = start_end_dates()
 
     # Load Gravity Spy Talk data file
-    talkload = load_talk(f"_data/{time_deltas['talk_file']}")
+    #talkload = load_talk(f"_data/{time_deltas['talk_file']}")
 
     # Call segment_by_time function using the automated start-end days.
     talk_dat0 = segment_by_time(talkload, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # Talk Older week
