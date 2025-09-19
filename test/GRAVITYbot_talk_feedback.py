@@ -23,4 +23,4 @@ write_header = not os.path.exists(output_datafile)
 talk_data.to_csv('./_data/'+output_datafile, mode='a', header=write_header, index=False)
 
 existing = pd.read_csv('./_data/'+output_datafile).drop_duplicates()
-existing.to_csv('./_data/'+output_datafile, index=False)
+existing.to_csv('./test/'+output_datafile, index=False)

@@ -84,7 +84,7 @@ def get_talk_dat(slug):
             print(f'File {str(file)} is not from the current date, {date}.')
 
     return talk_url
-    
+
 
 def main():
     _ = load_dotenv(find_dotenv())
@@ -102,14 +102,14 @@ Raw Exception Output: "{exception}"\n
     - https://panoptes-python-client.readthedocs.io/en/latest/panoptes_client.html#panoptes_client.panoptes\n
     It is not uncommon for data retrieval to fail. Perhaps try again later? \n
     Stopping talk_data.py...\n
-    Attempting summary on older data... 
+    Attempting summary on older data...
         """
-        
+
         return print(warning)
-    
+
     # Clean up and format talk data
 
-#talk = main()
+talk = main()
 #####################################################################################################
 # To Do/Possible Improvements:
 # 1. Make more dynamic to deal with Panoptes API issues and once-per-day downloads

@@ -215,7 +215,22 @@ def main():
     print("GravitySpy Talk Forum Data Request Complete")
 
     # Get the most recent csv name, and the start and end dates for the most recent two weeks.
-    time_deltas = start_end_dates()
+    #time_deltas = start_end_dates()
+    #29 Aug-2 Sep
+    # datetime.strptime(date_string, "%m/%d/%Y").date()
+    talk_dat1_start = datetime.strptime('2025-09-01', '%Y-%m-%d') - timedelta(days=7)
+    talk_dat0_end = talk_dat1_start - timedelta(days=1)
+    talk_dat0_start = talk_dat0_end - timedelta(days=7)
+    print(talk_dat1_start)
+
+
+    time_deltas = {
+        'talk_file' :   'project-1104-comments_2025-09-09.csv',
+        'talk_dat1_start' : talk_dat1_start.strftime('%Y-%m-%d'),
+        'talk_dat0_end' : talk_dat0_end.strftime('%Y-%m-%d'),
+        'talk_dat0_start' : talk_dat0_start.strftime('%Y-%m-%d'),
+        'talk_dat1_end' : datetime.strptime('2025-09-02', '%Y-%m-%d').strftime('%Y-%m-%d')
+    }
 
     # Load Gravity Spy Talk data file
     talkload = load_talk(f"_data/{time_deltas['talk_file']}")
@@ -243,7 +258,7 @@ def main():
     # Sending Email containing Zooniverse Talk summary
     print("Sending Email...")
     #try:
-    email = emails.main(date = current_day, body = gsBot)
+    #email = emails.main(date = current_day, body = gsBot)
     #except:
     #    print("WARNING: Email failed to send.")
 

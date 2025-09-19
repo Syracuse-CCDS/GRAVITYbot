@@ -68,11 +68,12 @@ def alog_prompt(prior_data, current_data, lab):
 The data involve discussions surrounding LIGO laboratory equipment. The data
 originally were in a dataframe of three columns. The first column was the
 url affiliated with a comment and the second column the comment title and
-the final column the actual comment text.
+the final column the comment text.
 
-Many of the acronyms relate to channels in LIGO sensors or other processes
+Many of the acronyms relate to channels, sensors, equiptment, or other processes
 surrounding LIGO. Translate these acronyms to full words from the LIGO
-Abbreviations and Acronyms list.
+Abbreviations and Acronyms list. If there is no cooresponding entry in the LIGO
+Abbreviations and Acronyms, use the acronym as is. Then, note the missing acronym.
 
 Consider the Prior aLOG Dataset:
 {DATA_DELIMITER}
@@ -87,31 +88,32 @@ Now consider the Current aLOG Dataset:
 Provide responses for some the specific kinds of activities that are different
 for the current aLOG Dataset relative to the prior aLOG Dataset.
 
-1. Are there unresolved issues related to particular sensors that may cause a
+1. Are there unresolved issues related to particular equiptment that may cause a
 glitch in the gravitational wave data? What are these issues? For each unresolved
 issue, provide a bullet. Also provide a sentence or two explaining each issue
 in simple language. Please provide the URL that references back to the relevant
 aLOG conversation.
 
-2. Were there alterations to particular sensors? For each unresolved issue,
+2. Were there alterations to particular equiptment? For each unresolved issue,
 provide a bullet and a sentence or two explaining each issue in pedestrian
 language. Provide the URLs that reference back to the relevant aLOG conversation.
 
 3. Where there external events, such as environmental issues that were not about
-sensor failures or modifications that might be related to glitches in gravitational
+equiptment failures or modifications that might be related to glitches in gravitational
 wave data? For each event, provide a bullet and a sentence or two explaining each
 issue in pedestrian language. Provide the URLs that reference back to the relevant
 aLOG conversation.
     """.strip()
 
     sys_prompt = f"""
-You are a LIGO scientist tasked with summarizing aLOG conversations for citizen
-scientists. The important conversations are about relevant engineering changes
+You are a LIGO engineer tasked with summarizing aLOG conversations for citizen scientists.
+The important conversations are about relevant engineering changes
 or events which may create glitches in gravitational wave data. Your goal is
 to help citizen scientists understand laboratory issues that will enable them
 to interpret Gravity Spy Glitch issues quickly. Use clear, simple language and
 avoid technical jargon to ensure accessibility. Translate acronyms to full
-words based upon LIGO Abbreviations and Acronyms whenever possible.
+words based upon LIGO Abbreviations and Acronyms. If there is no cooresponding entry in
+the LIGO Abbreviations and Acronyms, use the acronym as is. Note the missing information.
 
 When data is provided, you should expect to be delimited by lines consisting
 only of spaces and '{DATA_DELIMITER}'.
