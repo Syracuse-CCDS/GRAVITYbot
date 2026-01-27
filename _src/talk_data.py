@@ -28,7 +28,6 @@ import tarfile
 import urllib.request
 
 import pandas
-
 import panoptes_client
 
 # Add project root to path for config import

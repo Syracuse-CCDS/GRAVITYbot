@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import alog
 import config
 import llm_client
-import llm_prompts
+import prompts
 
 
 def get_date_ranges(current_period_end):
@@ -161,7 +161,7 @@ def summarize_logs(prior_df, current_df, lab, output_path):
     print(f"Summarizing {lab} aLOGs.")
 
     try:
-        user_prompt, sys_prompt = llm_prompts.alog_prompt(prior_df, current_df, lab)
+        user_prompt, sys_prompt = prompts.alog_prompt(prior_df, current_df, lab)
         chat_response = chat_with_llm(user_prompt, sys_prompt)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(chat_response)
