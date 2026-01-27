@@ -3,12 +3,13 @@
 import os
 import sys
 
-from dotenv import find_dotenv, load_dotenv
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '_src')))
 
-# Add _src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '_src'))
-
+import config
 import llm_client
+
 
 def test_api_connection():
     client = llm_client.LLMClient().initialize()
@@ -25,6 +26,6 @@ def test_api_connection():
     ])
     print(f"✓ Generation test: {response}")
     
+
 if __name__ == "__main__":
-    load_dotenv(find_dotenv())
     test_api_connection()

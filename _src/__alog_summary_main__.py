@@ -12,12 +12,10 @@ Maintainer: Alexander O. Smith <aosmith@syr.edu>
 import csv
 import datetime
 import os
-import re
 import sys
 
 # Third-party Libraries
 import pandas
-import panoptes_client
 import pytz
 
 # Add project root to path for config import
@@ -28,6 +26,8 @@ import alog
 import config
 import llm_client
 import prompts
+import utils
+import zooniverse
 
 
 def get_date_ranges(current_period_end):
@@ -83,30 +83,6 @@ def filter_by_date_range(df, start_date, end_date):
     return filtered_data
 
 
-def clean_comment_text(text):
-    """
-    Cleans and normalizes a comment text by removing URLs, mentions, greetings,
-    thanks, unwanted punctuation, and extra whitespace.
-
-    Args:
-        text (str): The raw comment text to clean.
-
-    Returns:
-        str: The cleaned and normalized comment text.
-    """
-    text = re.sub(r"https?://\S+", " ", text)
-    text = re.sub(r"@\w+", " ", text)
-    text = re.sub(r"Hi,\n|Hello,\n", "", text, re.IGNORECASE)
-    text = re.sub(r"Thanks|Thank you", "", text, re.IGNORECASE)
-    text = re.sub(r"[^A-Za-z0-9>\s'\"?.!]", " ", text)
-    text = re.sub(r"\.+", " ", text)
-    text = re.sub(r"\s[b-z][.\s]", " ", text)
-    text = re.sub(r"^v$", "", text)
-    text = re.sub(r"[\n]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
 def parse_log_data(alog_data_file_path):
     """
     Parses aLOG CSV data and returns separate DataFrames for LHO and LLO entries.
@@ -137,7 +113,7 @@ def parse_log_data(alog_data_file_path):
                 "rss": row["rss_url"],
                 "comment_url": row["entry_url"],
                 "comment_title": row["entry_title"],
-                "comment": clean_comment_text(row["text"]),
+                "comment": utils.clean_alog_text(row["text"]),
             }
 
             (lho if clean_row["rss"] == lho_url else llo if clean_row["rss"] == llo_url else []).append(clean_row)
@@ -193,7 +169,7 @@ def process_lab_specific_logs(lab, data, date_ranges):
         if config.DRY_RUN:
             print(f"DRY RUN: Skipping Zooniverse post for {lab}")
         else:
-            post_to_zooniverse(lab, current_period_end, output_file)
+            zooniverse.post_alog_summary(current_period_end, lab)
 
 
 def fetch_logs_from_zooniverse():
@@ -230,49 +206,6 @@ def chat_with_llm(user_prompt, sys_prompt):
     )
 
     return response
-
-
-def post_to_zooniverse(lab, day_string, aLog_summary_file_path):
-    """
-    Posts an aLog summary as a discussion to the Zooniverse Talk forum for a specific lab.
-
-    Args:
-        lab (str): The name of the lab (e.g., 'LHO' or 'LLO') for which the summary is being posted.
-        day_string (str): The date string representing the summary's day (e.g., '2025-06-25').
-        aLog_summary_file_path (str): File path to the pre-generated summary text (Markdown).
-    """
-    board_id = 6945
-
-    discussion_footer = """
-NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers
-and is under construction and is subject to updates in training. Full documentation and development can
-be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns,
-questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.
-    """.strip().replace("\n", " ")
-
-    discussion_title = f"{lab} aLOG Summary: {day_string}"
-    discussion_text = f"## {discussion_title}\n\n"
-    with open(aLog_summary_file_path, "r", encoding="utf-8") as file:
-        discussion_text += file.read()
-    discussion_text += f"\n\n {discussion_footer}"
-    discussion_text = re.sub(r"https://", r"+tab+https://", discussion_text)
-
-    discussion = {
-        "discussions": {
-            "board_id": board_id,
-            "title": discussion_title,
-            "comments": [
-                {"body": discussion_text}
-            ]
-        }
-    }
-
-    panoptes_client.panoptes.Panoptes.connect(
-        username=config.PANOPTES_USER, 
-        password=config.PANOPTES_PASS
-    )
-    talk = panoptes_client.panoptes.Talk()
-    talk.http_post("discussions", json=discussion)
 
 
 def main(reference_date):

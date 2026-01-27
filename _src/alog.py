@@ -32,11 +32,15 @@ import datetime
 import os
 import re
 import ssl
+import sys
 
 import bs4
-import dotenv
 import feedparser
 import pandas
+
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import config
 
 VIRGO_URL = "https://logbook.virgo-gw.eu/virgo/"
 KAGRA_URL = "https://klog.icrr.u-tokyo.ac.jp/osl/"
@@ -206,7 +210,4 @@ def main(data_folder_path):
     return df.reset_index()
 
 if __name__ == "__main__":
-    _ = dotenv.load_dotenv(dotenv.find_dotenv())
-    data_folder_path = os.environ["GRAVITYBOT_DATA_FOLDER_PATH"]
-
-    main(data_folder_path)
+    main(config.DATA_FOLDER_PATH)

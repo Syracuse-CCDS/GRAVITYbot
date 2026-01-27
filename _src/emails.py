@@ -5,12 +5,10 @@ Original Author:
     Alexander O. Smith <aosmith@syr.edu>
 
 Purpose:
-    Handles email sending and Talk forum posting for GRAVITYbot summaries.
+    Handles email sending for GRAVITYbot Talk summaries.
 
 Requirements:
     - SMTP credentials configured in .env (SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_TO)
-    - Panoptes credentials for Talk posting (PANOPTES_USER, PANOPTES_PASS)
-    - Recipient email must accept messages from the sender address
 """
 
 import os
@@ -19,7 +17,6 @@ import sys
 from email.message import EmailMessage
 
 import markdown
-import panoptes_client
 
 # Add project root to path for config import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -78,71 +75,19 @@ def send_email(subject, html, text):
     print(f"Email sent to {config.SMTP_TO}")
 
 
-def post_talk_to_zooniverse(current_day):
+def send_talk_summary_email(date):
     """
-    Posts the Talk summary to the Zooniverse Talk forum.
-
-    Args:
-        current_day (str): Date string (YYYY-MM-DD) for the summary.
-    """
-    board_id = 6946  # Gravity Spy Talk board
-
-    panoptes_client.Panoptes.connect(
-        username=config.PANOPTES_USER,
-        password=config.PANOPTES_PASS
-    )
-
-    summary_path = config.OUTPUT_FOLDER_PATH / f"ZooniverseTalkSummary_{current_day}.md"
-    
-    with open(summary_path, 'r', encoding='utf-8') as file:
-        talk_sum = file.read()
-
-    discussion_title = f"Gravity Spy Talk Summary: {current_day}"
-    
-    discussion_footer = """
-NOTICE: Summary created by GRAVITYbot, an LLM powered summarizer maintained by Gravity Spy researchers
-and is under construction and is subject to updates in training. Full documentation and development can
-be found at the [Syracuse CCDS GitHub](https://github.com/Syracuse-CCDS/GRAVITYbot). Any concerns,
-questions, or recommended updates can be directed to the Syracuse Gravity Spy research team.
-    """.strip().replace("\n", " ")
-
-    body = f"## Talk Summary: {current_day}\n\n{talk_sum}\n\n{discussion_footer}"
-
-    payload = {
-        "discussions": {
-            "title": discussion_title,
-            "board_id": board_id,
-            "comments": [{"body": body}]
-        }
-    }
-
-    talk = panoptes_client.panoptes.Talk()
-    talk.http_post('discussions', json=payload)
-    
-    print(f"Talk summary posted to Zooniverse board {board_id}")
-
-
-def main(date, body=None):
-    """
-    Main entry point: sends email and posts to Zooniverse Talk.
+    Sends the Talk summary email.
 
     Args:
         date (str): Date string (YYYY-MM-DD) for the summary.
-        body (str, optional): Unused, kept for backward compatibility.
     """
-    # Send email
     subject, html, text = format_talk_email(date)
     send_email(subject, html, text)
-    
-    # Post to Zooniverse Talk forum
-    if config.DRY_RUN:
-        print("DRY RUN: Skipping Zooniverse Talk post")
-    else:
-        post_talk_to_zooniverse(date)
 
 
 if __name__ == "__main__":
     import datetime
     today = datetime.datetime.now().strftime('%Y-%m-%d')
-    print(f"Testing email/post for date: {today}")
-    main(today)
+    print(f"Testing email for date: {today}")
+    send_talk_summary_email(today)

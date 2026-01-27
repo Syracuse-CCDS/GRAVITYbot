@@ -15,16 +15,16 @@ import pytz
 from datetime import datetime, timezone, timedelta
 
 import pandas as pd
-from panoptes_client import Panoptes
 
 # Add project root to path for config import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import config
 import prompts
-import talk_data
 import emails
 import llm_client
+import utils
+import zooniverse
 
 ## ----------------------
 ## Monkey Patch print() for better debugging
@@ -56,7 +56,7 @@ def start_end_dates():
         talk_dat1_end = current_date.strftime('%Y-%m-%d')
         print(f'Checking for file date: {talk_dat1_end}')
 
-        file_search = os.listdir('_data/')
+        file_search = os.listdir(config.DATA_FOLDER_PATH)
         for f in file_search:
             if re.match(f'project-1104-comments_{talk_dat1_end}.csv', f):
                 talk_file = f
@@ -64,7 +64,7 @@ def start_end_dates():
 
         if talk_dat0_start == '2009-12-12':
             print("""
-DATA ISSUE: It appears current Talk Data needs to be imported to the _data directory.
+DATA ISSUE: It appears current Talk Data needs to be imported to the data directory.
 
 TROUBLESHOOTING SUGGESTIONS:
     1. Make sure __main__.main() is running load_text(file_path) with the expected talk data file path.
@@ -84,26 +84,6 @@ TROUBLESHOOTING SUGGESTIONS:
         'talk_dat0_start': talk_dat0_start,
         'talk_dat0_end': talk_dat0_end
     }
-
-
-def clean_comments(text):
-    """Applies all regex cleaning for talk comments."""
-    text = re.sub('This comment has been deleted', '', text)
-    text = re.sub(r'https.*\s', ' ', text)
-    text = re.sub(r'@\w+', ' ', text)
-    text = re.sub(r'Hi,\n|Hello,\n', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'Thanks|Thank you', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'[^A-Za-z0-9\>\s\'\"\?\.\!]', ' ', text)
-    text = re.sub(r'\.+', ' ', text)
-    text = re.sub('projects zooniverse gravity spy talk subjects', ' ', text)
-    text = re.sub('zooniverse gravity spy talk comment page', ' ', text)
-    text = re.sub(r'\s[b-z][\.\s]', ' ', text)
-    text = re.sub(r'^v$', '', text)
-    text = re.sub(r'[\n]', ' ', text)
-    text = re.sub(r'[0-9]+\s', ' ', text)
-    text = re.sub(r'[a-z][0-9]+', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
 
 
 def load_talk(file_path):
@@ -127,7 +107,7 @@ def load_talk(file_path):
     times = pd.to_datetime(timestamp, utc=True, format='mixed', errors='raise')
     comment_urls = reader.apply(
         lambda row: f"{talk_url}{row['board_id']}/{row['discussion_id']}", axis=1)
-    text = reader['comment_body'].fillna('').apply(clean_comments)
+    text = reader['comment_body'].fillna('').apply(utils.clean_talk_text)
 
     text_dat = pd.DataFrame({
         'timestamp': times,
@@ -187,7 +167,7 @@ def main():
     current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
     # Get Talk Data from Panoptes API
-    talkdata = talk_data.main()
+    zooniverse.fetch_talk_export()
     print("GravitySpy Talk Forum Data Request Complete")
 
     # Get the most recent csv name and date ranges
@@ -217,11 +197,17 @@ def main():
     if config.DRY_RUN:
         print("DRY RUN: Skipping email and Zooniverse Talk post")
     else:
-        print("Sending email and posting to Zooniverse Talk...")
+        print("Sending email...")
         try:
-            emails.main(date=current_day)
+            emails.send_talk_summary_email(current_day)
         except Exception as e:
-            print(f"WARNING: Email/post failed. Error: {e}")
+            print(f"WARNING: Email failed to send. Error: {e}")
+        
+        print("Posting to Zooniverse Talk...")
+        try:
+            zooniverse.post_talk_summary(current_day)
+        except Exception as e:
+            print(f"WARNING: Zooniverse post failed. Error: {e}")
 
     print("------------------")
     print("Talk summary complete")
