@@ -12,19 +12,29 @@ Maintainer: Alexander O. Smith <aosmith@syr.edu>
 import csv
 import datetime
 import os
-import pathlib
 import re
+import sys
 
 # Third-party Libraries
-import dotenv
-import openai
 import pandas
 import panoptes_client
 import pytz
 
+# Add paths for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
+
 # Local Modules
 import alog
+import config
+import llm_client
 import llm_prompts
+
+if config.DRY_RUN:
+    print("=" * 50)
+    print("DRY RUN MODE - No emails or posts will be sent")
+    print("=" * 50)
+
 
 def get_date_ranges(current_period_end):
     """
@@ -42,14 +52,13 @@ def get_date_ranges(current_period_end):
         - Dates are calculated in UTC.
         - Each period spans 5 consecutive days, inclusive of both start and end.
     """
-
     date_fmt = "%Y-%m-%d"
 
     current_period_start = current_period_end - datetime.timedelta(days=4)
     prior_period_end = current_period_start - datetime.timedelta(days=1)
     prior_period_start = prior_period_end - datetime.timedelta(days=4)
 
-    return  {
+    return {
         "prior_period_start": prior_period_start.strftime(date_fmt),
         "prior_period_end": prior_period_end.strftime(date_fmt),
         "current_period_start": current_period_start.strftime(date_fmt),
@@ -73,7 +82,6 @@ def filter_by_date_range(df, start_date, end_date):
         - Both `start_date` and `end_date` are assumed to be in UTC.
         - The 'timestamp' column in `df` must contain timezone-aware datetime objects.
     """
-
     date_time_format = "%Y-%m-%d"
     start_date_normalized = pytz.UTC.localize(datetime.datetime.strptime(start_date, date_time_format))
     end_date_normalized = pytz.UTC.localize(datetime.datetime.strptime(end_date, date_time_format))
@@ -91,28 +99,15 @@ def clean_comment_text(text):
 
     Returns:
         str: The cleaned and normalized comment text.
-
-    Behavior:
-        - Removes URLs starting with 'https' up to the next whitespace.
-        - Removes Twitter-style mentions (e.g., @username).
-        - Removes greetings like 'Hi,' or 'Hello,' (case-insensitive).
-        - Removes gratitude phrases like 'Thanks' or 'Thank you' (case-insensitive).
-        - Removes any character not alphanumeric or common punctuation (?, !, ., >, quotes).
-        - Collapses repeated periods into single spaces.
-        - Removes standalone single letters b-z surrounded by spaces or dots.
-        - Removes isolated lowercase 'v'.
-        - Replaces newline characters with spaces.
-        - Collapses multiple whitespace into single spaces.
     """
-
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"@\w+", " ", text)
-    text = re.sub(r"Hi,\n|Hello,\n", "" , text, re.IGNORECASE)
+    text = re.sub(r"Hi,\n|Hello,\n", "", text, re.IGNORECASE)
     text = re.sub(r"Thanks|Thank you", "", text, re.IGNORECASE)
     text = re.sub(r"[^A-Za-z0-9>\s'\"?.!]", " ", text)
     text = re.sub(r"\.+", " ", text)
     text = re.sub(r"\s[b-z][.\s]", " ", text)
-    text = re.sub(r"^v$", "" ,text)
+    text = re.sub(r"^v$", "", text)
     text = re.sub(r"[\n]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
@@ -129,14 +124,7 @@ def parse_log_data(alog_data_file_path):
         tuple: Two pandas DataFrames:
             - The first contains entries from the LIGO Hanford Observatory (LHO).
             - The second contains entries from the LIGO Livingston Observatory (LLO).
-
-    Notes:
-        - Entries are filtered by RSS URL to distinguish between LHO and LLO.
-        - Dates are parsed into UTC timezone-aware datetime objects.
-        - Malformed dates are skipped with a warning.
-        - Each log entry includes: timestamp, RSS URL, comment URL, title, and cleaned comment text.
     """
-
     lho_url = "https://alog.ligo-wa.caltech.edu/aLOG/rss-feed.php"
     llo_url = "https://alog.ligo-la.caltech.edu/aLOG/rss-feed.php"
     date_fmt = "%a, %d %b %Y %H:%M:%S %z"
@@ -158,7 +146,6 @@ def parse_log_data(alog_data_file_path):
                 "comment": clean_comment_text(row["text"]),
             }
 
-            ## Append the row to the correct list based on rss url
             (lho if clean_row["rss"] == lho_url else llo if clean_row["rss"] == llo_url else []).append(clean_row)
 
     return pandas.DataFrame(lho), pandas.DataFrame(llo)
@@ -176,17 +163,12 @@ def summarize_logs(prior_df, current_df, lab, output_path):
 
     Returns:
         bool: True if the summary was successfully generated and saved; False otherwise.
-
-    Notes:
-        - Uses a lab-specific GPT-4 prompt to generate the summary.
-        - Any errors during prompt construction, model call, or file writing are caught and reported.
     """
-
     print(f"Summarizing {lab} aLOGs.")
 
     try:
         user_prompt, sys_prompt = llm_prompts.alog_prompt(prior_df, current_df, lab)
-        chat_response = chat_with_gpt4(user_prompt, sys_prompt)
+        chat_response = chat_with_llm(user_prompt, sys_prompt)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(chat_response)
         return True
@@ -204,40 +186,36 @@ def process_lab_specific_logs(lab, data, date_ranges):
         data (pd.DataFrame): Parsed aLOG data for the lab.
         date_ranges (dict): Start and end dates for the two recent time windows.
     """
-
-    output_folder_path = os.environ["GRAVITYBOT_OUTPUT_FOLDER_PATH"]
-
     columns_to_project = ["comment_url", "comment_title", "comment"]
     prior_period_start, prior_period_end = date_ranges["prior_period_start"], date_ranges["prior_period_end"]
     current_period_start, current_period_end = date_ranges["current_period_start"], date_ranges["current_period_end"]
-    output_file = f"{output_folder_path}/{lab}aLogForumSummary_{current_period_end}.md"
+    output_file = config.OUTPUT_FOLDER_PATH / f"{lab}aLogForumSummary_{current_period_end}.md"
 
     data_prior = filter_by_date_range(data, prior_period_start, prior_period_end)[columns_to_project]
     data_current = filter_by_date_range(data, current_period_start, current_period_end)[columns_to_project]
     print(f"{lab}: prior log records {len(data_prior)} current log records {len(data_current)}.")
 
     if summarize_logs(data_prior, data_current, lab, output_file):
-        post_to_zooniverse(lab, current_period_end, output_file)
+        if config.DRY_RUN:
+            print(f"DRY RUN: Skipping Zooniverse post for {lab}")
+        else:
+            post_to_zooniverse(lab, current_period_end, output_file)
 
 
 def fetch_logs_from_zooniverse():
-    data_folder_path = os.environ["GRAVITYBOT_DATA_FOLDER_PATH"]
-    expected_result_file_path = f"{data_folder_path}/aLOG_RSS_deduplicated.csv"
+    """Fetches the latest aLOG data from Zooniverse."""
+    expected_result_file_path = config.DATA_FOLDER_PATH / "aLOG_RSS_deduplicated.csv"
 
-    ## --------------------
-    ## Retrieve most updated aLOG data
-    ## --------------------
     print("LIGO aLOG Forum Data Requested")
-    _ = alog.main(data_folder_path)
+    _ = alog.main(str(config.DATA_FOLDER_PATH))
     print("LIGO aLOG Forum Data Request Complete")
-    ## --------------------
 
     return expected_result_file_path
 
 
-def chat_with_gpt4(user_prompt, sys_prompt):
+def chat_with_llm(user_prompt, sys_prompt):
     """
-    Sends a prompt to OpenAI's GPT-4 Turbo model and returns the generated response.
+    Sends a prompt to Azure OpenAI and returns the generated response.
 
     Args:
         user_prompt (str): The main user message or question.
@@ -245,33 +223,19 @@ def chat_with_gpt4(user_prompt, sys_prompt):
 
     Returns:
         str: The assistant's reply as a string.
-
-    Notes:
-        - Uses the GPT-4 Turbo model via the OpenAI SDK.
-        - Temperature controls randomness: lower = more deterministic, higher = more diverse.
-        - Token usage affects cost; be mindful of the `max_tokens` parameter.
-        - Requires the environment variable 'OPENAI_API_KEY' to be set.
     """
+    client = llm_client.LLMClient().initialize()
 
-    model = "gpt-4-turbo"
-    temperature = 0.8
-    max_tokens = 4096
-
-    client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-    messages = [
-        {"role": "system", "content": sys_prompt}, # System "role" in which openAI responds
-        {"role": "user", "content": user_prompt}   # What "I" am asking/telling the model
-    ]
-
-    response = client.chat.completions.create(
-        messages=messages,
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
+    response = client.generate(
+        messages=[
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.8,
+        max_tokens=4096
     )
 
-    return response.choices[0].message.content
+    return response
 
 
 def post_to_zooniverse(lab, day_string, aLog_summary_file_path):
@@ -282,27 +246,7 @@ def post_to_zooniverse(lab, day_string, aLog_summary_file_path):
         lab (str): The name of the lab (e.g., 'LHO' or 'LLO') for which the summary is being posted.
         day_string (str): The date string representing the summary's day (e.g., '2025-06-25').
         aLog_summary_file_path (str): File path to the pre-generated summary text (Markdown).
-
-    Environment Variables Required:
-        PANOPTES_USER: Zooniverse username for API authentication.
-        PANOPTES_PASS: Corresponding password.
-        PANOPTES_ID: User ID (currently unused, but retrieved).
-
-    Behavior:
-        - Reads the summary file and appends a GRAVITYbot footer.
-        - Escapes URLs for browser behavior by prepending '+tab+'.
-        - Constructs a discussion payload for Zooniverse Talk.
-        - Authenticates with the Panoptes client.
-        - Prepares the discussion for posting (currently commented out).
-
-    Notes:
-        - The actual API call to post (`http_post`) is currently commented out.
-        - The board_id is hardcoded as 6945, which should be changed if posting to a different board.
     """
-
-    username = os.environ.get("PANOPTES_USER")
-    password = os.environ.get("PANOPTES_PASS")
-    user_id = os.environ.get("PANOPTES_ID")  # Currently unused
     board_id = 6945
 
     discussion_footer = """
@@ -329,7 +273,10 @@ questions, or recommended updates can be directed to the Syracuse Gravity Spy re
         }
     }
 
-    panoptes_client.panoptes.Panoptes.connect(username=username, password=password)
+    panoptes_client.panoptes.Panoptes.connect(
+        username=config.PANOPTES_USER, 
+        password=config.PANOPTES_PASS
+    )
     talk = panoptes_client.panoptes.Talk()
     talk.http_post("discussions", json=discussion)
 
@@ -340,30 +287,9 @@ def main(reference_date):
 
     Args:
         reference_date (datetime): The reference date used to determine the date ranges for log processing.
-
-    Workflow:
-        1. Fetches the latest aLOG data file from Zooniverse into a local data folder.
-        2. Parses the downloaded log data into separate DataFrames for LHO and LLO labs.
-        3. Calculates date ranges based on the given reference date.
-        4. Processes lab-specific logs for both LHO and LLO using the calculated date ranges.
-
-    Notes:
-        - Assumes supporting functions `fetch_logs_from_zooniverse`, `parse_log_data`,
-          `get_date_ranges`, and `process_lab_specific_logs` are implemented elsewhere.
-        - Designed to be the main entry point when running the script.
     """
-
-    ## --------------------
-    ## Make sure we have the latest alog data data from zooniverse
-    ## --------------------
     alog_data_file_path = fetch_logs_from_zooniverse()
-    ## --------------------
-
-    ## --------------------
-    ## filter logs into lab specific data
-    ## --------------------
     lho_data, llo_data = parse_log_data(alog_data_file_path)
-    ## --------------------
 
     date_ranges = get_date_ranges(reference_date)
     process_lab_specific_logs("LHO", lho_data, date_ranges)
@@ -371,54 +297,16 @@ def main(reference_date):
 
 
 if __name__ == "__main__":
-    _ = dotenv.load_dotenv(dotenv.find_dotenv())
-
-    ## ----------------------
-    ## Establish pathing to data and output folders
-    ## This should likely be done via the config
-    ## ----------------------
-    script_path = pathlib.Path(__file__).resolve()
-    project_root_folder = script_path.parent.parent
-    data_folder_path = (project_root_folder / "_data").resolve()
-    output_folder_path = (project_root_folder / "_output").resolve()
-    os.environ["GRAVITYBOT_DATA_FOLDER_PATH"] = str(data_folder_path)
-    os.environ["GRAVITYBOT_OUTPUT_FOLDER_PATH"] = str(output_folder_path)
-    print(f"Path to data folder..: {os.environ['GRAVITYBOT_DATA_FOLDER_PATH']}")
-    print(f"Path to output folder: {os.environ['GRAVITYBOT_OUTPUT_FOLDER_PATH']}")
-    ## ----------------------
-
-    ## ----------------------
-    ## Monkey Patch print() for better debugging
-    ## it would probably be better to use logging, but this is easier for now.
-    ## ----------------------
-    _print=print
+    # Monkey Patch print() for better debugging
+    # TODO: Replace with proper logging
+    _print = print
     def print(*args, **kwargs):
-        script_path = os.path.basename(__file__)
+        script_name = os.path.basename(__file__)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        _print(f"{script_path}[{timestamp}] ", *args, **kwargs)
-    ## ----------------------
+        _print(f"{script_name}[{timestamp}] ", *args, **kwargs)
 
-    ## --------------------
-    ## Testing: Override methods so they don't do stuff
-    ## --------------------
-    os.environ["GRAVITYBOT_OUTPUT_TESTING"] = "True"
-    if os.environ.get("GRAVITYBOT_OUTPUT_TESTING", "False").lower() == "true":
-        print("Non-Destructive Testing...")
-
-        def filter_by_date_range(df, start_date, end_date):
-            return df.sample(n=10)
-
-        def fetch_logs_from_zooniverse():
-            data_folder_path = os.environ["GRAVITYBOT_DATA_FOLDER_PATH"]
-            expected_result_file_path = f"{data_folder_path}/aLOG_RSS_deduplicated.csv"
-
-            print("LIGO aLOG Forum Data Requested")
-            print("LIGO aLOG Forum Data Request Complete")
-            return expected_result_file_path
-
-        def post_to_zooniverse(lab, day_string, aLog_summary_file_path):
-            pass
-    ## --------------------
+    print(f"Data folder: {config.DATA_FOLDER_PATH}")
+    print(f"Output folder: {config.OUTPUT_FOLDER_PATH}")
 
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     main(utc_now)

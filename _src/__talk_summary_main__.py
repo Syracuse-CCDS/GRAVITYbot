@@ -8,81 +8,71 @@
 #####################################################################################################
 #####################################################################################################
 # DEPENDENCIES ######################################################################################
-# Package Dependencies
-import os, sys, re, csv, openai, pytz, smtplib, ssl
-from datetime import datetime, timezone, date, timedelta
-import pandas as pd
+import os
+import sys
+import re
+import pytz
+from datetime import datetime, timezone, timedelta
 
-# API Imports
-from openai import OpenAI
+import pandas as pd
 from panoptes_client import Panoptes
 
-# Local enviornment imports and path appends
+# Local environment imports and path appends
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from dotenv import find_dotenv, load_dotenv
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_output')))
-import prompts, talk_data, emails
+
+import config
+import prompts
+import talk_data
+import emails
+import llm_client
+
+if config.DRY_RUN:
+    print("=" * 50)
+    print("DRY RUN MODE - No emails or posts will be sent")
+    print("=" * 50)
 
 ## ----------------------
 ## Monkey Patch print() for better debugging
-## it would probably be better to use logging, but this is easier for now.
+## TODO: Replace with proper logging
 ## ----------------------
-_print=print
+_print = print
 def print(*args, **kwargs):
-    # Add a timestamp to the print function
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Call the original print function with the timestamp
     _print(f"{os.path.basename(__file__)}[{timestamp}] ", *args, **kwargs)
 ## ----------------------
 
 #####################################################################################################
 # Functions #########################################################################################
-# 0. start_end_dates    :   produces two adjacent weeks spans
-# 1. clean_comments     :   regex cleaning of comments
-# 1. load_talk          :   loads and cleans talk data
-# 2. segment_by_time    :   limits talk data to those within particular dates
 
-# Function: Produces start and end dates for the most recent two weeks of Talk data.
 def start_end_dates():
+    """Produces start and end dates for the most recent two weeks of Talk data."""
     print('Loading the most recent Talk forum data...')
-    # Today's date
     current_date = datetime.now(timezone.utc)
-    # Set talk_file to a 0 length string for the while loop
     talk_file = ''
-    count = 1
-    # While loop searches until length of talk_file >= 1 OR
-    # it will stop after 1000 iterations (= 10000 days prior current date)
+
     while len(talk_file) < 1:
-        # Set all dates relative to "current_time"
         talk_dat1_start = current_date - timedelta(days=7)
         talk_dat0_end = talk_dat1_start - timedelta(days=1)
         talk_dat0_start = talk_dat0_end - timedelta(days=7)
 
-        # Convert all the dates to strings formatted as the Talk file name conventions.
         talk_dat1_start = talk_dat1_start.strftime('%Y-%m-%d')
         talk_dat0_end = talk_dat0_end.strftime('%Y-%m-%d')
         talk_dat0_start = talk_dat0_start.strftime('%Y-%m-%d')
         talk_dat1_end = current_date.strftime('%Y-%m-%d')
         print(f'Checking for file date: {talk_dat1_end}')
 
-        # Search _data directory for the most recent file, based on "current_date"
         file_search = os.listdir('_data/')
         for f in file_search:
             if re.match(f'project-1104-comments_{talk_dat1_end}.csv', f):
                 talk_file = f
-                print(
-                f"""
-NOTICE: Talk file "{talk_file}" found!
-    Generating date range for summary...\n
-                """
-                )
+                print(f'NOTICE: Talk file "{talk_file}" found!\n    Generating date range for summary...\n')
 
-        # If the earliest date searched in Talk data is older than Zooniverse, stop.
         if talk_dat0_start == '2009-12-12':
             print("""
-DATA ISSUE: It appears current Talk Data needs to be imported to the _data directory.\n
+DATA ISSUE: It appears current Talk Data needs to be imported to the _data directory.
+
 TROUBLESHOOTING SUGGESTIONS:
     1. Make sure __main__.main() is running load_text(file_path) with the expected talk data file path.
     2. Make sure the proper panoptes credentials are configured in the .env file.
@@ -95,15 +85,16 @@ TROUBLESHOOTING SUGGESTIONS:
         current_date -= timedelta(days=1)
 
     return {
-        'talk_file'         :   talk_file,
-        'talk_dat1_start'   :   talk_dat1_start,
-        'talk_dat1_end'     :   talk_dat1_end,
-        'talk_dat0_start'   :   talk_dat0_start,
-        'talk_dat0_end'     :   talk_dat0_end
+        'talk_file': talk_file,
+        'talk_dat1_start': talk_dat1_start,
+        'talk_dat1_end': talk_dat1_end,
+        'talk_dat0_start': talk_dat0_start,
+        'talk_dat0_end': talk_dat0_end
     }
 
-# Function: Adds all regex cleaning for talk into a single function
+
 def clean_comments(text):
+    """Applies all regex cleaning for talk comments."""
     text = re.sub('This comment has been deleted', '', text)
     text = re.sub(r'https.*\s', ' ', text)
     text = re.sub(r'@\w+', ' ', text)
@@ -121,149 +112,124 @@ def clean_comments(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-# Function: loads Talk data and gets comments which contain text
+
 def load_talk(file_path):
+    """Loads Talk data and gets comments which contain text."""
     talk_url = 'https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk/'
 
-    # Import CSV of Talk as Pandas DataFrame
     reader = pd.read_csv(file_path, encoding='utf8')
 
-    # NOTICE: gb_id is GRAVITYbot's user_id. We remove affiliated rows that match comment_user_id to reduce circularity in summaries
-    _ = load_dotenv(find_dotenv())
-    gb_id = os.environ.get("PANOPTES_ID")
+    # Drop rows with board_ids associated with GRAVITYbot to reduce circularity in summaries
+    drop_board = [6872]
+    reader = reader[~reader.board_id.isin(drop_board)]
+    
+    # Drop GRAVITYbot user_id
+    # NOTE: Hardcoded because dynamic lookup caused issues (see original comments)
+    drop_gb = [2877652]
+    reader = reader[~reader.comment_user_id.isin(drop_gb)]
 
-    # NOTICE: these could be added to the dotenv file to automate them rather than hardcode them
-    # Drop rows with board_ids associated with GRAVITYbot: 6872, 6946, 6945
-    drop_board = [6872] # This will reduce the risk of circular summaries
-    # drop all rows with these board_ids
-    reader = reader[reader.board_id.isin(drop_board) == False]
-    # Drop GRAVITYbot User_id
-    # WEIRD ISSUE HERE: so my idea here was I can always just pull the ID that GRAVITYbot
-    # is assigned to, and drop that ID dynamically. But for some reason, when I did that,
-    # it ONLY summarized GRAVITYbot. So I re-hardcoded it for now.
-    drop_gb = [2877652] #gb_id]
-    reader = reader[reader.comment_user_id.isin(drop_gb) == False]
-
-    # Define the Universal timezone
     utc = pytz.UTC
 
     timestamp = reader['comment_created_at']
     times = pd.to_datetime(timestamp, utc=True, format='mixed', errors='raise')
-    comment_urls =  reader.apply(
+    comment_urls = reader.apply(
         lambda row: f"{talk_url}{row['board_id']}/{row['discussion_id']}", axis=1)
     text = reader['comment_body'].fillna('').apply(clean_comments)
 
-    # Generate DataFrame of data necessary for GRAVITYbot interpretation
     text_dat = pd.DataFrame({
-        'timestamp'     : times,
-        'comment'       : text,
-        'comment_url'   : comment_urls,
+        'timestamp': times,
+        'comment': text,
+        'comment_url': comment_urls,
     })
 
     return text_dat
 
-# Function: transforms dates to segment questions
+
 def segment_by_time(text_dat, start_date, end_date):
-    # Parse and localize start_date and end_date to UTC
+    """Filters data to a specific date range and formats for LLM input."""
     utc = pytz.UTC
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     start_dt = utc.localize(start_dt)
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     end_dt = utc.localize(end_dt)
 
-    # Get the comments and URLs between the date range start_date & end_date
     talk_dat = text_dat[(text_dat['timestamp'] >= start_dt) & (text_dat['timestamp'] <= end_dt)]
     gpt_talk_reduce = talk_dat[['comment', 'comment_url']]
-    gpt_talk_str = gpt_talk_reduce.to_string(header = False, index = False)
+    gpt_talk_str = gpt_talk_reduce.to_string(header=False, index=False)
     gpt_talk_str = re.sub(r'\s+', ' ', gpt_talk_str)
 
     return gpt_talk_str
 
-# Function: Calls GPT-4 Turbo
+
 def chat_with_gpt4(user_prompt, sys_prompt):
-    _ = load_dotenv(find_dotenv())
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    """Calls Azure OpenAI for summarization."""
+    client = llm_client.LLMClient().initialize()
 
-    response = client.chat.completions.create(
-        # Messages: priming the model for a response
-        messages = [
-
-            {'role' : 'system', 'content' : sys_prompt},# System "role" in which openAI responds
-            {'role': 'user', 'content': user_prompt}    # What "I" am asking/telling the model
-            ],
-        model="gpt-4-turbo",                            # The openAI model for the project
-        temperature=    0.8,                            # Lower = more flexibility, Higher = more accurate
-        max_tokens=     4000                            # NOTICE: higher tokens, more money.
+    response = client.generate(
+        messages=[
+            {'role': 'system', 'content': sys_prompt},
+            {'role': 'user', 'content': user_prompt}
+        ],
+        temperature=0.8,
+        max_tokens=4000
     )
 
-    # Outfile of Call and Response to GravitySpy
     current_time = f"{datetime.now()}"
     with open("_output/gravityBot_output.txt", "a") as out_file:
         out_file.write(f"GRAVITYBOT PROMPT TIME: {current_time}\n\n")
         out_file.write(f"SYSTEM PROMPT:\n{sys_prompt}\nUser Prompt: {user_prompt}\n")
-        out_file.write(f"GRAVITYBOT RESPONSE:\n{str(response)}\n\n")
+        out_file.write(f"GRAVITYBOT RESPONSE:\n{response}\n\n")
 
-    return response.choices[0].message.content
+    return response
+
 
 def main():
     print("------------------")
     print("Starting talk summary...")
     print("------------------")
 
+    current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
     # Get Talk Data from Panoptes API
     talkdata = talk_data.main()
     print("GravitySpy Talk Forum Data Request Complete")
 
-    # Get the most recent csv name, and the start and end dates for the most recent two weeks.
-    #time_deltas = start_end_dates()
-    #29 Aug-2 Sep
-    # datetime.strptime(date_string, "%m/%d/%Y").date()
-    talk_dat1_start = datetime.strptime('2025-09-01', '%Y-%m-%d') - timedelta(days=7)
-    talk_dat0_end = talk_dat1_start - timedelta(days=1)
-    talk_dat0_start = talk_dat0_end - timedelta(days=7)
-    print(talk_dat1_start)
-
-
-    time_deltas = {
-        'talk_file' :   'project-1104-comments_2025-09-09.csv',
-        'talk_dat1_start' : talk_dat1_start.strftime('%Y-%m-%d'),
-        'talk_dat0_end' : talk_dat0_end.strftime('%Y-%m-%d'),
-        'talk_dat0_start' : talk_dat0_start.strftime('%Y-%m-%d'),
-        'talk_dat1_end' : datetime.strptime('2025-09-02', '%Y-%m-%d').strftime('%Y-%m-%d')
-    }
+    # Get the most recent csv name and date ranges
+    time_deltas = start_end_dates()
 
     # Load Gravity Spy Talk data file
     talkload = load_talk(f"_data/{time_deltas['talk_file']}")
 
-    # Call segment_by_time function using the automated start-end days.
-    talk_dat0 = segment_by_time(talkload, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end']) # Talk Older week
-    talk_dat1 = segment_by_time(talkload, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end']) # Talk Newer week
+    # Segment by time for the two week periods
+    talk_dat0 = segment_by_time(talkload, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end'])
+    talk_dat1 = segment_by_time(talkload, time_deltas['talk_dat1_start'], time_deltas['talk_dat1_end'])
 
-    current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-
-    # Call ex_func_prompt_gen from prompts.py
+    # Generate prompts
     talk_prompt = prompts.ligo_prompt(talk_dat0, talk_dat1)
 
-    # Call chatGPT function for Zooniverse Talk summary
+    # Call LLM for Zooniverse Talk summary
     try:
         gsBot = chat_with_gpt4(talk_prompt[0], talk_prompt[1])
         with open(f'./_output/ZooniverseTalkSummary_{current_day}.md', 'w') as gsBotResp:
             gsBotResp.write(gsBot)
-            gsBotResp.close()
     except Exception as e:
-        print("WARNING: No Zooniverse Talk Summary file saved due to an exception")
-        print(e)
+        print(f"WARNING: No Zooniverse Talk Summary file saved. Error: {e}")
         return
 
-    # Sending Email containing Zooniverse Talk summary
-    print("Sending Email...")
-    #try:
-    #email = emails.main(date = current_day, body = gsBot)
-    #except:
-    #    print("WARNING: Email failed to send.")
+    # Send email containing Zooniverse Talk summary
+    if config.DRY_RUN:
+        print("DRY RUN: Skipping email send")
+    else:
+        print("Sending Email...")
+        try:
+            email = emails.main(date=current_day, body=gsBot)
+        except Exception as e:
+            print(f"WARNING: Email failed to send. Error: {e}")
 
     print("------------------")
     print("Ending talk summary...")
     print("------------------")
 
-gsBotResponse = main()
+
+if __name__ == "__main__":
+    main()

@@ -1,65 +1,160 @@
 # GRAVITYbot: A Forum Summary LLM Bot
 
-A LLM bot which summarizes the forum pages for the citizen science project [Gravity Spy](https://www.zooniverse.org/projects/zooniverse/gravity-spy).
+An LLM bot that summarizes forum pages for the citizen science project [Gravity Spy](https://www.zooniverse.org/projects/zooniverse/gravity-spy).
 
-## Description:
+## Description
 
-GRAVITYbot 
+GRAVITYbot:
 
 1. Summarizes ["Talk" forum pages](https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk) of Gravity Spy
-2. Summarizes [aLOGs forum posts](https://alog.ligo-la.caltech.edu/aLOG/) of LIGO's LLO and LHO lab locations
+2. Summarizes [aLOG forum posts](https://alog.ligo-la.caltech.edu/aLOG/) of LIGO's LLO and LHO lab locations
 
-Gravity Spy is a citizen science project which classifies glitches occuring through The Laser Interferometer Gravitational-Wave Observatory (LIGO) laser interferometer sensor data. As such this project aims to summarize citizen science communication and day-to-day science and engineering updates on a lab site. The objective of this is for more streamlined communication between distributed citizen scientists and the LIGO scientists about classification issues surrounding gravitational wave data.
+Gravity Spy is a citizen science project that classifies glitches occurring in The Laser Interferometer Gravitational-Wave Observatory (LIGO) sensor data. This project summarizes citizen science communication and day-to-day science and engineering updates. The objective is to streamline communication between distributed citizen scientists and LIGO scientists about classification issues surrounding gravitational wave data.
 
-The primary tasks it aims to accomplish are:
+### Primary Tasks
 
-1. Summarizing Talk pages for LIGO scientists.
-2. Summarizing Talk pages for citizen science.
-3. Logging dynamics of citizen science learning through automated weekly or subweekly updates.
+1. Summarizing Talk pages for LIGO scientists
+2. Summarizing Talk pages for citizen scientists
+3. Logging dynamics of citizen science learning through automated weekly or sub-weekly updates
 
-Possible future tasks it might be applied to are:
+### Possible Future Tasks
 
-- A chatbot for promoting locations in the project chat or the wiki.
-- A chatbot which promotes contributions to the project chat or the wiki.
+- A chatbot for promoting locations in the project chat or wiki
+- A chatbot that promotes contributions to the project chat or wiki
+- RAG-based retrieval for contextual responses
 
-## Getting Started:
+## Getting Started
 
-### Dependencies:
+### Dependencies
+
 - Python 3.10+
-- openai, datetime, dotenv, pandas
-- Zooniverse Talk Pages CSV File
+- `openai` (Azure OpenAI SDK)
+- `pandas`
+- `python-dotenv`
+- `panoptes-client`
+- `pytz`
 
-### Initializing the Project:
-This is currently under revision, and subject to updates of the project. However, currently the project needs a directory containing prompts.py, __main__.py, the Talk Pages Data File, and an .env file. First make sure you have an env file containing an openAI key assigned to variable OPENAI_API_KEY and the username and password to Zooniverse with rights to download Talk data.
+Install dependencies:
+```bash
+pip install openai pandas python-dotenv panoptes-client pytz
+```
 
-Next, both __main__.py and prompts.py may need some configuration. Minimally, to run the project, one must run the __main__.py after configuration:
- 
-1. Set the working directory
-2. Set the Talk Pages directory location with the correct csv filename.
-3. Define the date-time span of Talk pages posts of which needs summary.
-4. (Optional): Define which prompt function, variable you wish GRAVITYbot to run.
-5. (Optional): Tuning the openAI parameters
+### Environment Configuration
 
-While optional, prompts.py contains more detailed instructions about how to create a prompt.
+Create a `.env` file in the project root with the following variables:
 
-## Help:
+```bash
+# Azure OpenAI Configuration
+AZURE_OPENAI_API_KEY=<your-azure-openai-key>
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com
+AZURE_OPENAI_API_VERSION=2025-01-01-preview
+AZURE_OPENAI_DEPLOYMENT=<your-deployment-name>
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=<your-embedding-deployment>  # Optional, for future RAG
 
-Proceed with caution. This is an incomplete project which requires using funds to use openAI. We (the project developers, Gravity Spy, and/or LIGO) are not liable for any expenses you may be charged by running this project locally.
+# Zooniverse/Panoptes Configuration
+PANOPTES_USER=<zooniverse-username>
+PANOPTES_PASS=<zooniverse-password>
+PANOPTES_ID=<your-panoptes-user-id>
 
-## Authors:
+# Dry Run Mode (optional)
+# Set to "true" to run full pipeline without sending emails or posting to Zooniverse
+GRAVITYBOT_DRY_RUN=false
 
-Initial development was written by Alexander O. Smith as a part of employment for Gravity Spy. Any specific questions can be directed towards aosmith@syr.edu or active Gravity Spy lab members.
+# Custom Paths (optional - defaults to _data/ and _output/ in project root)
+# GRAVITYBOT_DATA_FOLDER_PATH=/path/to/data
+# GRAVITYBOT_OUTPUT_FOLDER_PATH=/path/to/output
+```
 
-## License:
+### Project Structure
+
+```
+GRAVITYbot/
+├── config.py                      # Centralized configuration
+├── _src/
+│   ├── llm_client.py              # Azure OpenAI client abstraction
+│   ├── __main__.py                # Main entry point (Talk + aLOG summaries)
+│   ├── __talk_summary_main__.py   # Talk-only summary script
+│   ├── __alog_summary_main__.py   # aLOG-only summary script
+│   └── prompts.py                 # Prompt templates
+├── _data/
+│   ├── talk_data.py               # Talk data fetching
+│   ├── alog.py                    # aLOG data fetching
+│   └── *.csv                      # Downloaded data files
+├── _output/
+│   └── *.md                       # Generated summaries
+├── test/
+│   └── test_openai_access.py      # API connectivity test
+├── .env                           # Configuration (not in repo)
+└── README.md
+```
+
+### Dry Run Mode
+
+To test the full pipeline without sending emails or posting to Zooniverse, set:
+
+```bash
+GRAVITYBOT_DRY_RUN=true
+```
+
+In dry run mode:
+- Data is fetched from Zooniverse/aLOG feeds
+- LLM summaries are generated and saved to `_output/`
+- Emails are **not** sent
+- Zooniverse posts are **not** created
+
+This is useful for testing changes without affecting production systems.
+
+### Running the Project
+
+1. **Test Azure connectivity:**
+   ```bash
+   python test/test_openai_access.py
+   ```
+
+2. **Run full summary (Talk + aLOG):**
+   ```bash
+   python _src/__main__.py
+   ```
+
+3. **Run Talk summary only:**
+   ```bash
+   python _src/__talk_summary_main__.py
+   ```
+
+4. **Run aLOG summary only:**
+   ```bash
+   python _src/__alog_summary_main__.py
+   ```
+
+### Customization
+
+Prompt templates are defined in `_src/prompts.py`. See that file for instructions on creating or modifying prompts.
+
+LLM parameters (temperature, max_tokens) can be adjusted in `_src/llm_client.py` or passed as arguments to `client.generate()`.
+
+## Help
+
+This project uses Azure OpenAI via university Azure credits. If running locally with your own Azure subscription, be mindful of token usage and associated costs.
+
+For issues or questions, contact the active Gravity Spy lab members or the maintainers listed below.
+
+## Authors
+
+Initial development by Alexander O. Smith as part of employment for Gravity Spy. Questions can be directed to aosmith@syr.edu or active Gravity Spy lab members.
+
+## License
+
 This project is licensed under an MIT "Expat" License. See the LICENSE.md file for details.
 
-## Acknowledgments:
+## Acknowledgments
 
-We begin by acknowledging with respect the Onondaga Nation, Central Fire of the Haudenosaunee Confederacy, on whose ancestral lands Syracuse now inhabits. We are mindful that the technology that makes this project possible comes from the mineral extraction by multinational corporations, which decimate and displace Indigenous people and their land all over the world.
+We begin by acknowledging with respect the Onondaga Nation, Central Fire of the Haudenosaunee Confederacy, on whose ancestral lands Syracuse now stands. We are mindful that the technology that makes this project possible comes from mineral extraction by multinational corporations, which decimate and displace Indigenous peoples and their lands all over the world.
 
-Additionally, Alexander would like to thank Gabriel Davila - Campos and Una Joh for advice and initial guidance in development. 
+Additionally, Alexander would like to thank Gabriel Davila-Campos and Una Joh for advice and initial guidance in development.
 
-## Possible Backlog Tasks:
+## Backlog
 
-- Better logging for debugging
-- Automating posts to Zooniverse Project Talk forums or the wiki.
+- [ ] Replace monkey-patched `print()` with proper logging
+- [ ] Implement RAG for contextual retrieval
+- [ ] Automate posts to Zooniverse Project Talk forums
+- [ ] Add configuration file to replace environment variable path setup
