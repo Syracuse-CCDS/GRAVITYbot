@@ -22,7 +22,7 @@ import pytz
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Local Modules
-import alog
+import alog_feed
 import config
 import llm_client
 import prompts
@@ -177,7 +177,7 @@ def fetch_logs_from_zooniverse():
     expected_result_file_path = config.DATA_FOLDER_PATH / "aLOG_RSS_deduplicated.csv"
 
     print("LIGO aLOG Forum Data Requested")
-    _ = alog.main(str(config.DATA_FOLDER_PATH))
+    alog_feed.main(str(config.DATA_FOLDER_PATH))
     print("LIGO aLOG Forum Data Request Complete")
 
     return expected_result_file_path

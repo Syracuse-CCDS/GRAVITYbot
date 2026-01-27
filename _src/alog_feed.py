@@ -207,7 +207,6 @@ def main(data_folder_path):
     ## --------------------
 
     print(f"Unique alog row count: {len(df)}")
-    return df.reset_index()
 
 if __name__ == "__main__":
     main(config.DATA_FOLDER_PATH)
