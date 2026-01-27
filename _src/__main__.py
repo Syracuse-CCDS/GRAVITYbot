@@ -11,17 +11,10 @@ import datetime
 import os
 import sys
 
-# Add paths for imports
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_output')))
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import config
-
-if config.DRY_RUN:
-    print("=" * 50)
-    print("DRY RUN MODE - No emails or posts will be sent")
-    print("=" * 50)
 
 import __talk_summary_main__ as talk_summary
 import __alog_summary_main__ as alog_summary
@@ -31,6 +24,8 @@ def main():
     """Run both Talk and aLOG summary pipelines."""
     print("=" * 50)
     print("GRAVITYbot - Running all summaries")
+    if config.DRY_RUN:
+        print("DRY RUN MODE - No emails or posts will be sent")
     print("=" * 50)
     
     print("\n[1/2] Running Talk summary...")

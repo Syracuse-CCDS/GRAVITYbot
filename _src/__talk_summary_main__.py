@@ -17,21 +17,14 @@ from datetime import datetime, timezone, timedelta
 import pandas as pd
 from panoptes_client import Panoptes
 
-# Local environment imports and path appends
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_output')))
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import config
 import prompts
 import talk_data
 import emails
 import llm_client
-
-if config.DRY_RUN:
-    print("=" * 50)
-    print("DRY RUN MODE - No emails or posts will be sent")
-    print("=" * 50)
 
 ## ----------------------
 ## Monkey Patch print() for better debugging
@@ -175,7 +168,8 @@ def chat_with_gpt4(user_prompt, sys_prompt):
     )
 
     current_time = f"{datetime.now()}"
-    with open("_output/gravityBot_output.txt", "a") as out_file:
+    log_path = config.OUTPUT_FOLDER_PATH / "gravityBot_output.txt"
+    with open(log_path, "a") as out_file:
         out_file.write(f"GRAVITYBOT PROMPT TIME: {current_time}\n\n")
         out_file.write(f"SYSTEM PROMPT:\n{sys_prompt}\nUser Prompt: {user_prompt}\n")
         out_file.write(f"GRAVITYBOT RESPONSE:\n{response}\n\n")
@@ -186,6 +180,8 @@ def chat_with_gpt4(user_prompt, sys_prompt):
 def main():
     print("------------------")
     print("Starting talk summary...")
+    if config.DRY_RUN:
+        print("DRY RUN MODE - No emails or posts will be sent")
     print("------------------")
 
     current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
@@ -198,7 +194,7 @@ def main():
     time_deltas = start_end_dates()
 
     # Load Gravity Spy Talk data file
-    talkload = load_talk(f"_data/{time_deltas['talk_file']}")
+    talkload = load_talk(config.DATA_FOLDER_PATH / time_deltas['talk_file'])
 
     # Segment by time for the two week periods
     talk_dat0 = segment_by_time(talkload, time_deltas['talk_dat0_start'], time_deltas['talk_dat0_end'])
@@ -210,24 +206,25 @@ def main():
     # Call LLM for Zooniverse Talk summary
     try:
         gsBot = chat_with_gpt4(talk_prompt[0], talk_prompt[1])
-        with open(f'./_output/ZooniverseTalkSummary_{current_day}.md', 'w') as gsBotResp:
+        summary_path = config.OUTPUT_FOLDER_PATH / f"ZooniverseTalkSummary_{current_day}.md"
+        with open(summary_path, 'w') as gsBotResp:
             gsBotResp.write(gsBot)
     except Exception as e:
         print(f"WARNING: No Zooniverse Talk Summary file saved. Error: {e}")
         return
 
-    # Send email containing Zooniverse Talk summary
+    # Send email and post to Zooniverse Talk
     if config.DRY_RUN:
-        print("DRY RUN: Skipping email send")
+        print("DRY RUN: Skipping email and Zooniverse Talk post")
     else:
-        print("Sending Email...")
+        print("Sending email and posting to Zooniverse Talk...")
         try:
-            email = emails.main(date=current_day, body=gsBot)
+            emails.main(date=current_day)
         except Exception as e:
-            print(f"WARNING: Email failed to send. Error: {e}")
+            print(f"WARNING: Email/post failed. Error: {e}")
 
     print("------------------")
-    print("Ending talk summary...")
+    print("Talk summary complete")
     print("------------------")
 
 

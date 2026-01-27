@@ -20,20 +20,14 @@ import pandas
 import panoptes_client
 import pytz
 
-# Add paths for imports
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../_data')))
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Local Modules
 import alog
 import config
 import llm_client
 import llm_prompts
-
-if config.DRY_RUN:
-    print("=" * 50)
-    print("DRY RUN MODE - No emails or posts will be sent")
-    print("=" * 50)
 
 
 def get_date_ranges(current_period_end):
@@ -288,12 +282,22 @@ def main(reference_date):
     Args:
         reference_date (datetime): The reference date used to determine the date ranges for log processing.
     """
+    print("------------------")
+    print("Starting aLOG summary...")
+    if config.DRY_RUN:
+        print("DRY RUN MODE - No Zooniverse posts will be made")
+    print("------------------")
+    
     alog_data_file_path = fetch_logs_from_zooniverse()
     lho_data, llo_data = parse_log_data(alog_data_file_path)
 
     date_ranges = get_date_ranges(reference_date)
     process_lab_specific_logs("LHO", lho_data, date_ranges)
     process_lab_specific_logs("LLO", llo_data, date_ranges)
+    
+    print("------------------")
+    print("aLOG summary complete")
+    print("------------------")
 
 
 if __name__ == "__main__":

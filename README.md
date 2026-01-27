@@ -33,10 +33,13 @@ Gravity Spy is a citizen science project that classifies glitches occurring in T
 - `python-dotenv`
 - `panoptes-client`
 - `pytz`
+- `feedparser`
+- `beautifulsoup4`
+- `markdown`
 
 Install dependencies:
 ```bash
-pip install openai pandas python-dotenv panoptes-client pytz
+pip install openai pandas python-dotenv panoptes-client pytz feedparser beautifulsoup4 markdown
 ```
 
 ### Environment Configuration
@@ -49,16 +52,23 @@ AZURE_OPENAI_API_KEY=<your-azure-openai-key>
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com
 AZURE_OPENAI_API_VERSION=2025-01-01-preview
 AZURE_OPENAI_DEPLOYMENT=<your-deployment-name>
-AZURE_OPENAI_EMBEDDING_DEPLOYMENT=<your-embedding-deployment>  # Optional, for future RAG
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=<your-embedding-deployment>  # For future RAG
 
 # Zooniverse/Panoptes Configuration
+PANOPTES_SLUG=zooniverse/gravity-spy
 PANOPTES_USER=<zooniverse-username>
 PANOPTES_PASS=<zooniverse-password>
 PANOPTES_ID=<your-panoptes-user-id>
 
-# Dry Run Mode (optional)
-# Set to "true" to run full pipeline without sending emails or posting to Zooniverse
-GRAVITYBOT_DRY_RUN=false
+# SMTP / Email Configuration
+SMTP_HOST=<smtp-server>
+SMTP_USER=<smtp-username>
+SMTP_PASS=<smtp-password>
+SMTP_FROM=<sender-email>
+SMTP_TO=<recipient-email>
+
+# Runtime Options
+GRAVITYBOT_DRY_RUN=true  # Set to "false" for production
 
 # Custom Paths (optional - defaults to _data/ and _output/ in project root)
 # GRAVITYBOT_DATA_FOLDER_PATH=/path/to/data
@@ -72,16 +82,17 @@ GRAVITYbot/
 ├── config.py                      # Centralized configuration
 ├── _src/
 │   ├── llm_client.py              # Azure OpenAI client abstraction
-│   ├── __main__.py                # Main entry point (Talk + aLOG summaries)
+│   ├── alog.py                    # aLOG RSS feed fetching and parsing
+│   ├── talk_data.py               # Zooniverse Talk data fetching
+│   ├── prompts.py                 # LLM prompt templates
+│   ├── emails.py                  # Email sending and Talk forum posting
+│   ├── __main__.py                # Main entry point (runs both pipelines)
 │   ├── __talk_summary_main__.py   # Talk-only summary script
-│   ├── __alog_summary_main__.py   # aLOG-only summary script
-│   └── prompts.py                 # Prompt templates
+│   └── __alog_summary_main__.py   # aLOG-only summary script
 ├── _data/
-│   ├── talk_data.py               # Talk data fetching
-│   ├── alog.py                    # aLOG data fetching
-│   └── *.csv                      # Downloaded data files
+│   └── *.csv                      # Downloaded data files (no code)
 ├── _output/
-│   └── *.md                       # Generated summaries
+│   └── *.md                       # Generated summaries (no code)
 ├── test/
 │   └── test_openai_access.py      # API connectivity test
 ├── .env                           # Configuration (not in repo)
@@ -156,5 +167,6 @@ Additionally, Alexander would like to thank Gabriel Davila-Campos and Una Joh fo
 
 - [ ] Replace monkey-patched `print()` with proper logging
 - [ ] Implement RAG for contextual retrieval
-- [ ] Automate posts to Zooniverse Project Talk forums
-- [ ] Add configuration file to replace environment variable path setup
+- [ ] Make project pip-installable (pyproject.toml) to eliminate sys.path manipulation
+- [ ] Fix "Skipping bad date: entry_date" warning in aLOG CSV parsing
+- [ ] Reduce verbosity of `start_end_dates()` file search output
