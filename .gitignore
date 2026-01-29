@@ -5,12 +5,6 @@ __pycache__/
 .env
 *.log
 
-_output/*.txt
-_output/*.csv
-_output/*.md
-
-_data/*.txt
-_data/*.csv
-_data/*.md
-
 GRAVITYbotENV/
+_output/
+_data/

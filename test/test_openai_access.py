@@ -1,52 +1,31 @@
-import urllib3
-from urllib3.exceptions import HTTPError
-import json
-from dotenv import find_dotenv, load_dotenv
+# test/test_openai_access.py
+"""Test Azure OpenAI connectivity."""
 import os
+import sys
 
-# Constants for headers
-def build_headers() -> dict:
-    """
-    Builds the headers dictionary based on the defined constants.
+# Add project root to path for config import
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '_src')))
+
+import config
+import llm_client
+
+
+def test_api_connection():
+    client = llm_client.LLMClient().initialize()
     
-    Returns:
-        dict: A dictionary of HTTP headers.
-    """
-
-    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-
-    OPENAI_ORGANIZATION = os.environ.get("OPENAI_ORGANIZATION")
-    if OPENAI_ORGANIZATION:
-        headers["OpenAI-Organization"] = OPENAI_ORGANIZATION
-
-    OPENAI_ORGANIZATION = os.environ.get("OPENAI_PROJECT")
-    if OPENAI_PROJECT:
-        headers["OpenAI-Project"] = OPENAI_ORGANIZATION
-
-    return headers
-
-def test_api_key():
-    """
-    Tests the OpenAI API key by making a request to the models endpoint.
-    Prints the success message or the encountered HTTPS error.
-    """
-    http = urllib3.PoolManager()
-    url = "https://api.openai.com/v1/models"
-    headers = build_headers()
-
-    try:
-        response = http.request("GET", url, headers=headers)
-        if response.status == 200:
-            print("API key is valid. Request successful.")
-        else:
-            print(f"Request failed with status code: {response.status}")
-            print("Response:", json.loads(response.data.decode('utf-8')))
-    except HTTPError as e:
-        print(f"HTTPS error occurred: {e}")
+    if not client.is_available():
+        print("✗ Azure OpenAI connection failed.")
+        sys.exit(1)
+    
+    print("✓ Azure OpenAI connection successful.")
+    
+    # Optional: test actual generation
+    response = client.generate([
+        {"role": "user", "content": "Say 'hello' and nothing else."}
+    ])
+    print(f"✓ Generation test: {response}")
+    
 
 if __name__ == "__main__":
-    OPENAI_ORGANIZATION = None  # Replace if applicable, else set to None
-    OPENAI_PROJECT = None  # Replace if applicable; Org then required
-    _ = load_dotenv(find_dotenv())
-    test_api_key()
+    test_api_connection()
