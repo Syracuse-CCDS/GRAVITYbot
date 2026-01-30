@@ -19,15 +19,16 @@ import pandas
 import pytz
 
 # Add project root to path for config import
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Local Modules
 import alog_feed
-import config
 import llm_client
 import prompts
 import utils
 import zooniverse
+
+import config
 
 
 def get_date_ranges(current_period_end):
@@ -56,7 +57,7 @@ def get_date_ranges(current_period_end):
         "prior_period_start": prior_period_start.strftime(date_fmt),
         "prior_period_end": prior_period_end.strftime(date_fmt),
         "current_period_start": current_period_start.strftime(date_fmt),
-        "current_period_end": current_period_end.strftime(date_fmt)
+        "current_period_end": current_period_end.strftime(date_fmt),
     }
 
 
@@ -77,9 +78,15 @@ def filter_by_date_range(df, start_date, end_date):
         - The 'timestamp' column in `df` must contain timezone-aware datetime objects.
     """
     date_time_format = "%Y-%m-%d"
-    start_date_normalized = pytz.UTC.localize(datetime.datetime.strptime(start_date, date_time_format))
-    end_date_normalized = pytz.UTC.localize(datetime.datetime.strptime(end_date, date_time_format))
-    filtered_data = df[df["timestamp"].between(start_date_normalized, end_date_normalized)]
+    start_date_normalized = pytz.UTC.localize(
+        datetime.datetime.strptime(start_date, date_time_format)
+    )
+    end_date_normalized = pytz.UTC.localize(
+        datetime.datetime.strptime(end_date, date_time_format)
+    )
+    filtered_data = df[
+        df["timestamp"].between(start_date_normalized, end_date_normalized)
+    ]
     return filtered_data
 
 
@@ -103,7 +110,9 @@ def parse_log_data(alog_data_file_path):
     with open(alog_data_file_path, encoding="utf-8") as file_in:
         for row in csv.DictReader(file_in):
             try:
-                timestamp = datetime.datetime.strptime(row["entry_date"], date_fmt).astimezone(pytz.UTC)
+                timestamp = datetime.datetime.strptime(
+                    row["entry_date"], date_fmt
+                ).astimezone(pytz.UTC)
             except ValueError:
                 print(f"Skipping bad date: {row['entry_date']}")
                 continue
@@ -116,7 +125,13 @@ def parse_log_data(alog_data_file_path):
                 "comment": utils.clean_alog_text(row["text"]),
             }
 
-            (lho if clean_row["rss"] == lho_url else llo if clean_row["rss"] == llo_url else []).append(clean_row)
+            (
+                lho
+                if clean_row["rss"] == lho_url
+                else llo
+                if clean_row["rss"] == llo_url
+                else []
+            ).append(clean_row)
 
     return pandas.DataFrame(lho), pandas.DataFrame(llo)
 
@@ -157,13 +172,27 @@ def process_lab_specific_logs(lab, data, date_ranges):
         date_ranges (dict): Start and end dates for the two recent time windows.
     """
     columns_to_project = ["comment_url", "comment_title", "comment"]
-    prior_period_start, prior_period_end = date_ranges["prior_period_start"], date_ranges["prior_period_end"]
-    current_period_start, current_period_end = date_ranges["current_period_start"], date_ranges["current_period_end"]
-    output_file = config.OUTPUT_FOLDER_PATH / f"{lab}aLogForumSummary_{current_period_end}.md"
+    prior_period_start, prior_period_end = (
+        date_ranges["prior_period_start"],
+        date_ranges["prior_period_end"],
+    )
+    current_period_start, current_period_end = (
+        date_ranges["current_period_start"],
+        date_ranges["current_period_end"],
+    )
+    output_file = (
+        config.OUTPUT_FOLDER_PATH / f"{lab}aLogForumSummary_{current_period_end}.md"
+    )
 
-    data_prior = filter_by_date_range(data, prior_period_start, prior_period_end)[columns_to_project]
-    data_current = filter_by_date_range(data, current_period_start, current_period_end)[columns_to_project]
-    print(f"{lab}: prior log records {len(data_prior)} current log records {len(data_current)}.")
+    data_prior = filter_by_date_range(data, prior_period_start, prior_period_end)[
+        columns_to_project
+    ]
+    data_current = filter_by_date_range(data, current_period_start, current_period_end)[
+        columns_to_project
+    ]
+    print(
+        f"{lab}: prior log records {len(data_prior)} current log records {len(data_current)}."
+    )
 
     if summarize_logs(data_prior, data_current, lab, output_file):
         if config.DRY_RUN:
@@ -199,10 +228,10 @@ def chat_with_llm(user_prompt, sys_prompt):
     response = client.generate(
         messages=[
             {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user", "content": user_prompt},
         ],
-        temperature=0.8,
-        max_tokens=4096
+        temperature=0.4,
+        max_tokens=4096,
     )
 
     return response
@@ -220,14 +249,14 @@ def main(reference_date):
     if config.DRY_RUN:
         print("DRY RUN MODE - No Zooniverse posts will be made")
     print("------------------")
-    
+
     alog_data_file_path = fetch_logs_from_zooniverse()
     lho_data, llo_data = parse_log_data(alog_data_file_path)
 
     date_ranges = get_date_ranges(reference_date)
     process_lab_specific_logs("LHO", lho_data, date_ranges)
     process_lab_specific_logs("LLO", llo_data, date_ranges)
-    
+
     print("------------------")
     print("aLOG summary complete")
     print("------------------")
@@ -237,6 +266,7 @@ if __name__ == "__main__":
     # Monkey Patch print() for better debugging
     # TODO: Replace with proper logging
     _print = print
+
     def print(*args, **kwargs):
         script_name = os.path.basename(__file__)
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

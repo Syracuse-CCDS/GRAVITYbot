@@ -6,7 +6,7 @@ Original Author:
 
 Purpose:
     Prompt templates for GRAVITYbot LLM summarization tasks.
-    
+
     - ligo_prompt(): Summarizes Zooniverse Talk forum discussions for LIGO scientists
     - alog_prompt(): Summarizes aLOG engineering posts for citizen scientists
 """
@@ -14,7 +14,6 @@ Purpose:
 import json
 
 import pandas
-
 
 DATA_DELIMITER = "~~~"
 
@@ -68,26 +67,25 @@ def ligo_prompt(talk_dat0, talk_dat1):
     I want a structured outline of of what occurred in "this week's" forum data relative to "last week's" focusing on the following concerns:
 
     1. EACH possible new glitch suggestion outlined in the following format. (There will likely be multiple of these. Report all of them.)
-        - What is the new glitch suggested this week relative to last week?
-        - If this new suggested glitch is being discussed anywhere else in the data.
-        - How likely is the glitch to be reduced to a previous classification? Vetting whether a new glitch is really new is time consuming. Often there can be long and detailed discussion about how a volunteer should interpret existing glitch classes in order to avoid confusion in the future for the volunteer. The volume of discussion matters less than whether volunteers are suggesting they agree or disagree. However, if there is general agreement that it is different enough, what suggests this? If it is not new enough, where might the confusion be?
+        - What new glitch is suggested this week relative to last week?
+        - Is this new suggested glitch being discussed anywhere else in the data?
+        - How likely is the glitch already accounted for by a previous classification? New glitch proposals are time consuming and most glitch suggestions or questions do not lead to a formal proposal. There could be long and detailed discussion about how a volunteer should interpret existing glitch classes in order to avoid confusion in the future for the volunteer. As such, the volume of references to the glitch suggestion does not matter. However, if there is general agreement that it is different enough, what suggests this? If it is not new enough, what was the confusion about?
         - PROVIDE EVERY RELATED COMMENT'S URL, including follow-up discussion, as a bulleted list. (I.E. IF THERE IS SIGNIFICANT DISCUSSION THERE SHOULD BE MULTIPLE URLs)
     CONTINUE RESPONDING TO EACH OF THESE IN THE ABOVE FORMAT AS 1.1, 1.2, 1.3, ETC FOR EACH NEW GLITCH BEFORE ANSWERING ANY ADDITIONAL QUESTIONS!
 
     2. Volunteers learn by exploring classifications and technical aspects of glitches. EXCLUDING RESPONSES RELATED TO CONCERN 1, answer the following bullet points with a final bullet with ALL RELEVANT URLs.
         - Are there emerging questions related to the glitch classes, sensors, or gravitational wave science in this week's data?
-        - Describe each question and the reasoning for the question.
-        - Provide at two or three sentences describing these emerging questions.
+        - Describe each question and what motivated each question. Provide at two or three sentences describing these emerging questions.
 
-    3. I want to know if volunteers have any hypotheses about the origins of glitches. LIGO gravitational wave glitches are fundamentally related to sensors, channel noise, and/or some ecological factors. Conclude with a final bullet with ALL RELEVANT URLs.
+    3. I want to know if volunteers have any hypotheses about the origins of glitches. LIGO gravitational wave glitches are fundamentally related to sensors, channel noise, and/or external ecological factors. Conclude with a final bullet with ALL RELEVANT URLs.
         - Are there any conversation suggesting questions, hypothetical, or declarative origins of any glitch class? If so what are the hypotheses?
         - What reasons or rationale is provided?
     RESPONDING TO EACH HYPOTHESES/EXPLANATION PROVIDE THEM IN THE FORMAT 3.1, 3.2, 3.3, ETC BEFORE MOVING ON TO QUESTION 4!
 
     4. I want to know if volunteers discuss possible technical issues with particular sensors or channels that are not related to 4.
-        - Are there any emerging attention or questions surrounding particular glitches' connections to sensors or channels this week relative to last week
-        - What specifically do they describe?
-        - Provide at least two sentences for these questions or thoughts.
+        - Are there any emerging comments or questions surrounding particular glitches' connections to sensors or channels this week relative to last week
+        - What specifically do these comments or questions describe?
+        - Provide at least two sentences for these comments or questions.
         - Provide ALL relevant URLs.
     """
 
@@ -112,7 +110,9 @@ def alog_prompt(prior_data, current_data, lab):
     """
     template_call_rep = "75875"
     template_link_text = f"{lab}: {template_call_rep}"
-    template_link_url = f"https://alog.ligo-la.caltech.edu/aLOG/index.php?callRep={template_call_rep}"
+    template_link_url = (
+        f"https://alog.ligo-la.caltech.edu/aLOG/index.php?callRep={template_call_rep}"
+    )
 
     user_prompt = f"""
 The data involve discussions surrounding LIGO laboratory equipment. The data
