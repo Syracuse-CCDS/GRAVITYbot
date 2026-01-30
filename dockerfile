@@ -7,17 +7,7 @@ FROM python:3.11-slim
 #    libxslt-dev \
 #    && rm -rf /var/lib/apt/lists/*
 
-RUN python -m pip install --no-cache-dir \
-    openai \
-    pandas \
-    pytz \
-    panoptes-client \
-    feedparser \
-    beautifulsoup4 \
-    lxml \
-    Markdown \
-    markdownify \
-    requests \
-    python-dotenv
-
 WORKDIR /var/task/
+
+COPY requirements.txt .
+RUN python -m pip install --no-cache-dir -r requirements.txt
