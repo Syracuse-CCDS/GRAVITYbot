@@ -95,10 +95,18 @@ GRAVITYbot/
 │   ├── talk_summary.py            # Talk-only summary script
 │   └── alog_summary.py            # aLOG-only summary script
 ├── _data/
-│   └── *.csv                      # Downloaded data files (gitignored)
+│   ├── talk_posts.csv             # Zooniverse Talk export (canonical)
+│   ├── talk_posts_raw.json        # Raw Zooniverse export (debug, overwritten)
+│   ├── aLOG_RSS.csv               # aLOG entries (canonical, accumulates)
+│   ├── aLOG_raw_LHO.xml           # Raw LHO RSS feed (debug, overwritten)
+│   └── aLOG_raw_LLO.xml           # Raw LLO RSS feed (debug, overwritten)
 ├── _output/
-│   ├── *.md                       # Generated summaries
-│   └── llm_calls.log              # LLM prompt/response log
+│   ├── last_talk_summary.md       # Latest Talk summary
+│   ├── last_lho_alog_summary.md   # Latest LHO aLOG summary
+│   ├── last_llo_alog_summary.md   # Latest LLO aLOG summary
+│   ├── llm_talk.log               # LLM call log for Talk summary
+│   ├── llm_alog_lho.log           # LLM call log for LHO summary
+│   └── llm_alog_llo.log           # LLM call log for LLO summary
 ├── test/
 │   └── test_openai_access.py      # API connectivity test
 ├── .env                           # Configuration (not in repo)
@@ -109,19 +117,20 @@ GRAVITYbot/
 
 ### Dry Run Mode
 
-To test the full pipeline without sending emails or posting to Zooniverse, set:
+To test the pipeline without external API calls or posting, set:
 
 ```bash
 GRAVITYBOT_DRY_RUN=true
 ```
 
 In dry run mode:
-- Data is fetched from Zooniverse/aLOG feeds
+- Data fetching is **skipped** (uses existing files in `_data/`)
+- Date ranges are derived from the data itself (useful for testing with old data)
 - LLM summaries are generated and saved to `_output/`
 - Emails are **not** sent
 - Zooniverse posts are **not** created
 
-This is useful for testing changes without affecting production systems.
+This is useful for testing changes without affecting production systems or consuming API quotas.
 
 ### Running the Project
 
