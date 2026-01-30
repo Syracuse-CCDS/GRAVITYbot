@@ -54,6 +54,10 @@ AZURE_OPENAI_API_VERSION=2025-01-01-preview
 AZURE_OPENAI_DEPLOYMENT=<your-deployment-name>
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT=<your-embedding-deployment>  # For future RAG
 
+# LLM Parameters (optional - these are the defaults)
+# GRAVITYBOT_LLM_TEMPERATURE=0.8
+# GRAVITYBOT_LLM_MAX_TOKENS=4096
+
 # Zooniverse/Panoptes Configuration
 PANOPTES_SLUG=zooniverse/gravity-spy
 PANOPTES_USER=<zooniverse-username>
@@ -65,7 +69,7 @@ SMTP_HOST=<smtp-server>
 SMTP_USER=<smtp-username>
 SMTP_PASS=<smtp-password>
 SMTP_FROM=<sender-email>
-SMTP_TO=<recipient-email>
+SMTP_TO=<recipient-email-or-comma-separated-list>
 
 # Runtime Options
 GRAVITYBOT_DRY_RUN=true  # Set to "false" for production
@@ -82,38 +86,51 @@ GRAVITYbot/
 ├── config.py                      # Centralized configuration
 ├── _src/
 │   ├── llm_client.py              # Azure OpenAI client abstraction
-│   ├── alog.py                    # aLOG RSS feed fetching and parsing
-│   ├── talk_data.py               # Zooniverse Talk data fetching
+│   ├── alog_feed.py               # aLOG RSS feed fetching
+│   ├── zooniverse.py              # Zooniverse Talk data fetching and posting
 │   ├── prompts.py                 # LLM prompt templates
-│   ├── emails.py                  # Email sending and Talk forum posting
-│   ├── __main__.py                # Main entry point (runs both pipelines)
-│   ├── __talk_summary_main__.py   # Talk-only summary script
-│   └── __alog_summary_main__.py   # aLOG-only summary script
+│   ├── emails.py                  # Email sending
+│   ├── utils.py                   # Text cleaning utilities
+│   ├── run_all.py                 # Main entry point (runs both pipelines)
+│   ├── talk_summary.py            # Talk-only summary script
+│   └── alog_summary.py            # aLOG-only summary script
 ├── _data/
-│   └── *.csv                      # Downloaded data files (no code)
+│   ├── talk_posts.csv             # Zooniverse Talk export (canonical)
+│   ├── talk_posts_raw.json        # Raw Zooniverse export (debug, overwritten)
+│   ├── aLOG_RSS.csv               # aLOG entries (canonical, accumulates)
+│   ├── aLOG_raw_LHO.xml           # Raw LHO RSS feed (debug, overwritten)
+│   └── aLOG_raw_LLO.xml           # Raw LLO RSS feed (debug, overwritten)
 ├── _output/
-│   └── *.md                       # Generated summaries (no code)
+│   ├── last_talk_summary.md       # Latest Talk summary
+│   ├── last_lho_alog_summary.md   # Latest LHO aLOG summary
+│   ├── last_llo_alog_summary.md   # Latest LLO aLOG summary
+│   ├── llm_talk.log               # LLM call log for Talk summary
+│   ├── llm_alog_lho.log           # LLM call log for LHO summary
+│   └── llm_alog_llo.log           # LLM call log for LLO summary
 ├── test/
 │   └── test_openai_access.py      # API connectivity test
 ├── .env                           # Configuration (not in repo)
+├── Dockerfile                     # Container definition
+├── docker_notes.txt               # Docker/cron usage guide
 └── README.md
 ```
 
 ### Dry Run Mode
 
-To test the full pipeline without sending emails or posting to Zooniverse, set:
+To test the pipeline without external API calls or posting, set:
 
 ```bash
 GRAVITYBOT_DRY_RUN=true
 ```
 
 In dry run mode:
-- Data is fetched from Zooniverse/aLOG feeds
+- Data fetching is **skipped** (uses existing files in `_data/`)
+- Date ranges are derived from the data itself (useful for testing with old data)
 - LLM summaries are generated and saved to `_output/`
 - Emails are **not** sent
 - Zooniverse posts are **not** created
 
-This is useful for testing changes without affecting production systems.
+This is useful for testing changes without affecting production systems or consuming API quotas.
 
 ### Running the Project
 
@@ -124,24 +141,28 @@ This is useful for testing changes without affecting production systems.
 
 2. **Run full summary (Talk + aLOG):**
    ```bash
-   python _src/__main__.py
+   python _src/run_all.py
    ```
 
 3. **Run Talk summary only:**
    ```bash
-   python _src/__talk_summary_main__.py
+   python _src/talk_summary.py
    ```
 
 4. **Run aLOG summary only:**
    ```bash
-   python _src/__alog_summary_main__.py
+   python _src/alog_summary.py
    ```
+
+### Docker Usage
+
+See `docker_notes.txt` for Docker build/run commands and cron configuration.
 
 ### Customization
 
 Prompt templates are defined in `_src/prompts.py`. See that file for instructions on creating or modifying prompts.
 
-LLM parameters (temperature, max_tokens) can be adjusted in `_src/llm_client.py` or passed as arguments to `client.generate()`.
+LLM parameters can be adjusted via environment variables (`GRAVITYBOT_LLM_TEMPERATURE`, `GRAVITYBOT_LLM_MAX_TOKENS`) or passed as arguments to `llm_client.generate()`.
 
 ## Help
 
@@ -165,8 +186,6 @@ Additionally, Alexander would like to thank Gabriel Davila-Campos and Una Joh fo
 
 ## Backlog
 
-- [ ] Replace monkey-patched `print()` with proper logging
-- [ ] Implement RAG for contextual retrieval
 - [ ] Make project pip-installable (pyproject.toml) to eliminate sys.path manipulation
-- [ ] Fix "Skipping bad date: entry_date" warning in aLOG CSV parsing
-- [ ] Reduce verbosity of `start_end_dates()` file search output
+- [ ] Implement RAG for contextual retrieval
+- [ ] Add unit tests for core functions

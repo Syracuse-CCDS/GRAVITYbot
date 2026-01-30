@@ -1,212 +1,336 @@
 """
-alog_feed_parser.py
+alog_feed.py
 
-Original Author:
-    Alexander O. Smith <aosmith@syr.edu>
+Retrieves and preprocesses aLOG (LIGO Logbook) posts from LHO and LLO RSS feeds.
+Maintains a deduplicated historical archive for summarization and future RAG use.
 
-Purpose:
-    This script automates the retrieval and preprocessing of aLOG (LIGO Logbook) posts
-    from the LHO and LLO RSS feeds. The extracted and cleaned data is intended to
-    support downstream analysis and summarization for LIGO's Citizen Science platform
-    (e.g., Gravity Spy), helping users identify technical activity and contextual events
-    relevant to gravitational wave data quality.
+Raw XML feeds are retained for debugging (overwritten each run).
+Canonical CSV grows over time via merge and deduplicate.
 
-Summary:
-    - Pulls recent posts from LHO and LLO aLOG RSS feeds
-    - Parses and cleans key metadata, including titles, authors, timestamps, and entry text
-    - Exports raw and deduplicated versions of the post set to CSV for further processing
-
-Known Limitations:
-    - Currently supports only LIGO (LHO and LLO) RSS feeds; Virgo and KAGRA URLs are noted
-      for future implementation but not scraped in this version.
-    - Assumes consistent HTML structure in RSS entries; will fail gracefully with warning
-      if unexpected formatting occurs.
-
-TODO:
-    - Begin prompting for alog
-    - Enhance logging and diagnostics
-    - Evaluate where and how to call prompt-generating logic
+Original Author: Alexander O. Smith <aosmith@syr.edu>
 """
-
-import datetime
+import logging
 import os
-import re
 import ssl
 import sys
+import urllib.request
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import bs4
 import feedparser
-import pandas
+import pandas as pd
 
 # Add project root to path for config import
+# TODO: Remove when proper packaging is implemented
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import config
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(filename)s[%(asctime)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+# ---------------------
+# Constants
+# ---------------------
+LIGO_RSS_URLS = {
+    "LHO": "https://alog.ligo-wa.caltech.edu/aLOG/rss-feed.php",
+    "LLO": "https://alog.ligo-la.caltech.edu/aLOG/rss-feed.php",
+}
+
+# Future expansion
 VIRGO_URL = "https://logbook.virgo-gw.eu/virgo/"
 KAGRA_URL = "https://klog.icrr.u-tokyo.ac.jp/osl/"
-LIGO_RSS_URLS = [
-    "https://alog.ligo-wa.caltech.edu/aLOG/rss-feed.php",  # LHO
-    "https://alog.ligo-la.caltech.edu/aLOG/rss-feed.php"   # LLO
+
+# Output filenames
+ALOG_EXPORT_FILENAME = "aLOG_RSS.csv"
+ALOG_RAW_FILENAME_TEMPLATE = "aLOG_raw_{lab}.xml"
+
+# How far back to fetch from RSS
+DEFAULT_LOOKBACK_WEEKS = 2
+
+# CSV columns (explicit ordering - matches legacy format)
+CSV_COLUMNS = [
+    "entry_title",
+    "entry_url",
+    "rss_url",
+    "entry_date",
+    "text",
+    "tags",
+    "report_id",
+    "author_email",
 ]
 
-def is_recent(entry_published, time_range):
-    """
-    Determines whether a given aLOG entry was published within a specified recent time range.
 
+@contextmanager
+def _insecure_ssl_context():
+    """
+    Temporarily disable SSL verification for feeds with expired/self-signed certs.
+    
+    Restores original context on exit to avoid affecting other code.
+    """
+    original_context = getattr(ssl, '_create_default_https_context', None)
+    try:
+        if hasattr(ssl, "_create_unverified_context"):
+            ssl._create_default_https_context = ssl._create_unverified_context
+        yield
+    finally:
+        if original_context is not None:
+            ssl._create_default_https_context = original_context
+        elif hasattr(ssl, '_create_default_https_context'):
+            delattr(ssl, '_create_default_https_context')
+
+
+def _is_recent(entry_published: str, lookback: timedelta) -> bool:
+    """
+    Check if an entry was published within the lookback window.
+    
     Args:
-        entry_published (str): The publication date string of the entry,
-            formatted as "%a, %d %b %Y %H:%M:%S %z" (e.g., "Wed, 26 Jun 2025 10:35:00 +0000").
-        time_range (datetime.timedelta): The maximum time delta between today and the entry's date
-            for it to be considered recent.
-
+        entry_published: Date string like "Wed, 29 Jan 2025 14:30:00 +0000"
+        lookback: Maximum age for an entry to be considered recent
+        
     Returns:
-        bool: True if the entry's date falls within the specified time range from today; False otherwise.
-
-    Notes:
-        - Only the date component is considered (time is ignored).
-        - The input timestamp is converted to a naive datetime (UTC offset is stripped).
-        - Today's date is normalized to midnight local time before comparison.
+        True if entry is within the lookback window
     """
-
     date_fmt = "%a, %d %b %Y %H:%M:%S %z"
-    entry_published = datetime.datetime.strptime(entry_published, date_fmt).replace(tzinfo=None)
-    today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    published_date = entry_published.replace(hour=0, minute=0, second=0, microsecond=0)
-    return today - published_date <= time_range
+    try:
+        entry_dt = datetime.strptime(entry_published, date_fmt)
+        now_utc = datetime.now(timezone.utc)
+        return now_utc - entry_dt <= lookback
+    except ValueError:
+        logger.warning(f"Could not parse date: {entry_published}")
+        return False
 
 
-def parse_rss_entry(entry):
+def _parse_rss_entry(entry, feed_url: str) -> dict | None:
     """
-    Parses a single RSS feed entry and extracts structured metadata and cleaned text content.
-
+    Parse a single RSS entry into structured data.
+    
     Args:
-        entry (feedparser.FeedParserDict): An individual RSS entry, typically from `feedparser.parse().entries`.
-
+        entry: A feedparser entry object
+        feed_url: The source feed URL (for metadata)
+        
     Returns:
-        dict: A dictionary containing the following keys:
-            - "entry_title" (str): Title of the RSS entry.
-            - "entry_url" (str): URL link to the aLOG report.
-            - "rss_url" (str): Base URL of the RSS feed.
-            - "entry_date" (str): The publication date of the entry (raw string).
-            - "text" (str): Cleaned and normalized body text of the aLOG entry.
-            - "tags" (dict): The first tag object from the entry’s tag list (if present).
-            - "report_id" (str): Extracted numeric report ID.
-            - "author_email" (str): Author’s email address or identifier, extracted from the entry.
-
-    Notes:
-        - Uses BeautifulSoup to parse and sanitize HTML content from the `summary` field.
-        - Performs text cleanup: removes newlines, tabs, extra punctuation, attached image references, and normalizes whitespace.
-        - If any required field is missing or malformed, a warning is printed and an empty dictionary is returned.
+        Dict with entry data, or None on failure
     """
+    import re
+    
     try:
         soup = bs4.BeautifulSoup(entry.summary, "html.parser")
-
-        rep_id = re.sub("Report ID: ", "", soup.find_all("p")[1].text)
-        author = re.sub("Author: ", "", soup.p.text)
-
-        txt = soup.get_text(separator=" ")
-        txt = re.sub("[\n\t]", "", txt)
-        txt = re.sub("[,;]", "", txt)
-        txt = re.sub(r"^.*Report ID: \d+ ", "", txt)
-        txt = re.sub(" Images attached to this report ", "", txt)
-        txt = re.sub(r"\s+", " ", txt)
-
+        paragraphs = soup.find_all("p")
+        
+        # Extract author and report ID from expected structure
+        author = ""
+        report_id = ""
+        
+        if paragraphs:
+            author = re.sub(r"^Author:\s*", "", paragraphs[0].get_text(strip=True))
+        if len(paragraphs) > 1:
+            report_id = re.sub(r"^Report ID:\s*", "", paragraphs[1].get_text(strip=True))
+        
+        if not report_id:
+            logger.warning(f"No report ID found for entry: {entry.title}")
+            return None
+        
+        # Clean body text
+        text = soup.get_text(separator=" ")
+        text = re.sub(r"[\n\t]", " ", text)
+        text = re.sub(r"[,;]", "", text)
+        text = re.sub(r"^.*Report ID:\s*\d+\s*", "", text)
+        text = re.sub(r"\s*Images attached to this report\s*", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        
+        # Extract first tag if present (serialize as string for CSV)
+        tags = ""
+        if hasattr(entry, 'tags') and entry.tags:
+            tags = str(entry.tags[0])
+        
         return {
+            "report_id": report_id,
             "entry_title": entry.title,
             "entry_url": entry.link,
-            "rss_url": entry.title_detail.base,
+            "rss_url": feed_url,
             "entry_date": entry.published,
-            "text": txt,
-            "tags": entry.tags[0],
-            "report_id": rep_id,
-            "author_email": author
+            "text": text,
+            "tags": tags,
+            "author_email": author,
         }
-
+    
     except Exception as e:
-        print(f"Warning: Failed to process entry '{entry.title}': {e}")
-        return {}
+        title = getattr(entry, 'title', 'unknown')
+        logger.warning(f"Failed to parse entry '{title}': {e}")
+        return None
 
 
-def rss_reduce(feed_url, weeks=2):
+def _fetch_and_save_raw_feed(lab: str, feed_url: str, data_path: Path) -> bytes | None:
     """
-    Parses and filters an RSS feed, yielding structured entries published within a recent time window.
-
+    Fetch raw XML from RSS feed and save for debugging.
+    
     Args:
-        feed_url (str): The URL of the RSS feed to parse (e.g., from an aLOG system).
-        weeks (int, optional): Number of weeks to look back from today. Defaults to 2.
-
-    Yields:
-        dict: Parsed and cleaned RSS entry data (via `parse_rss_entry`) for each entry
-        published within the specified time range.
-
-    Notes:
-        - Only entries considered "recent" by `is_recent()` are processed.
-        - If `parse_rss_entry()` fails or returns an empty result, that entry is skipped.
-        - This function uses a generator expression for memory efficiency.
-    """
-
-    time_range = datetime.timedelta(weeks=weeks)
-
-    yield from (
-        parsed_entry
-        for entry
-        in feedparser.parse(feed_url).entries
-        if is_recent(entry.published, time_range) and (parsed_entry := parse_rss_entry(entry))
-    )
-
-
-def main(data_folder_path):
-    """
-    Orchestrates the collection, deduplication, and persistence of aLOG RSS feed data.
-
-    Args:
-        data_folder_path (str): Path to the folder where aLOG RSS CSV files should be stored.
-
+        lab: Lab identifier (LHO or LLO)
+        feed_url: URL to fetch
+        data_path: Directory to save raw file
+        
     Returns:
-        pandas.DataFrame: A deduplicated DataFrame of aLOG RSS entries, indexed and ready for downstream processing.
-
-    Workflow:
-        1. Optionally bypasses SSL certificate validation (for feeds with expired or self-signed certs).
-        2. Iterates over all predefined LIGO RSS feed URLs and gathers recent, valid entries using `rss_reduce()`.
-        3. Appends new entries to `aLOG_RSS.csv`, preserving historical feed content.
-        4. Deduplicates entries by `report_id` and writes the cleaned data to `aLOG_RSS_deduplicated.csv`.
-        5. Prints the number of unique entries and returns the final deduplicated DataFrame.
-
-    Notes:
-        - Assumes that `LIGO_RSS_URLS`, `rss_reduce`, and `report_id` fields exist and are valid.
-        - If the feed returns malformed or duplicate entries, only the most recent instance per `report_id` is kept.
+        Raw XML bytes, or None if fetch failed
     """
+    try:
+        # Create unverified context for LIGO's problematic certs
+        context = ssl._create_unverified_context() if hasattr(ssl, "_create_unverified_context") else None
+        
+        request = urllib.request.Request(feed_url)
+        response = urllib.request.urlopen(request, context=context, timeout=30)
+        raw_xml = response.read()
+        
+        # Save raw for debugging
+        raw_filename = ALOG_RAW_FILENAME_TEMPLATE.format(lab=lab)
+        raw_path = data_path / raw_filename
+        raw_path.write_bytes(raw_xml)
+        logger.info(f"Saved raw feed: {raw_filename} ({len(raw_xml):,} bytes)")
+        
+        return raw_xml
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch {lab} feed: {e}")
+        return None
 
-    ## --------------------
-    ## If we might deal with feeds that are self signed or expired
-    ## --------------------
-    if hasattr(ssl, "_create_unverified_context"):
-        ssl._create_default_https_context = ssl._create_unverified_context
-    ## --------------------
 
-    aLOG_RSS_path = f"{data_folder_path}/aLOG_RSS.csv"
-    aLOG_RSS_deduplicated_path = f"{data_folder_path}/aLOG_RSS_deduplicated.csv"
+def _parse_feed_entries(raw_xml: bytes, feed_url: str, lookback: timedelta) -> list[dict]:
+    """
+    Parse raw XML into list of entry dicts.
+    
+    Args:
+        raw_xml: Raw XML bytes from feed
+        feed_url: Original feed URL (for metadata)
+        lookback: Maximum age for entries
+        
+    Returns:
+        List of parsed entry dicts
+    """
+    feed = feedparser.parse(raw_xml)
+    
+    if feed.bozo:
+        logger.warning(f"Feed parse warning: {feed.bozo_exception}")
+    
+    entries = []
+    failed_count = 0
+    
+    for entry in feed.entries:
+        if not _is_recent(entry.published, lookback):
+            continue
+        
+        parsed = _parse_rss_entry(entry, feed_url)
+        if parsed:
+            entries.append(parsed)
+        else:
+            failed_count += 1
+    
+    if failed_count > 0:
+        logger.warning(f"Failed to parse {failed_count} entries")
+    
+    return entries
 
-    feed_entries = []
-    for feed_url in LIGO_RSS_URLS:
-        feed_entries.extend(rss_reduce(feed_url))
 
-    ## --------------------
-    ## Append new feed entries
-    ## --------------------
-    df = pandas.DataFrame(feed_entries)
-    df.to_csv(aLOG_RSS_path, mode="a", header=False, index=False)
-    ## --------------------
+def _fetch_recent_entries(data_path: Path, weeks: int = DEFAULT_LOOKBACK_WEEKS) -> list[dict]:
+    """
+    Fetch recent entries from all RSS feeds, saving raw XML for each.
+    
+    Args:
+        data_path: Directory to save raw files
+        weeks: How many weeks back to include
+        
+    Returns:
+        List of parsed entry dicts
+    """
+    lookback = timedelta(weeks=weeks)
+    all_entries = []
+    
+    for lab, feed_url in LIGO_RSS_URLS.items():
+        logger.info(f"Fetching {lab} aLOG feed...")
+        
+        raw_xml = _fetch_and_save_raw_feed(lab, feed_url, data_path)
+        if raw_xml is None:
+            continue
+        
+        lab_entries = _parse_feed_entries(raw_xml, feed_url, lookback)
+        logger.info(f"Fetched {len(lab_entries)} entries from {lab}")
+        all_entries.extend(lab_entries)
+    
+    return all_entries
 
-    ## --------------------
-    ## Persist distinct feed entries
-    ## --------------------
-    df = pandas.read_csv(aLOG_RSS_path).reset_index()
-    df = df.drop_duplicates(subset=["report_id"], keep="last")
-    df.to_csv(aLOG_RSS_deduplicated_path, index=False)
-    ## --------------------
 
-    print(f"Unique alog row count: {len(df)}")
+def fetch_alog_entries(data_folder_path: Path | str | None = None) -> Path | None:
+    """
+    Fetch aLOG entries and merge with existing historical data.
+    
+    Maintains a single deduplicated CSV that grows over time, suitable for
+    both summarization (filter to recent) and future RAG ingestion (full history).
+    
+    Raw XML files are saved for debugging (overwritten each run).
+    
+    Args:
+        data_folder_path: Directory for output. Defaults to config.DATA_FOLDER_PATH.
+        
+    Returns:
+        Path to the CSV file, or None if fetch failed.
+    """
+    data_path = Path(data_folder_path) if data_folder_path else config.DATA_FOLDER_PATH
+    csv_path = data_path / ALOG_EXPORT_FILENAME
+    
+    # Fetch new entries from RSS (also saves raw XML)
+    new_entries = _fetch_recent_entries(data_path)
+    
+    if not new_entries:
+        logger.warning("No new entries fetched from RSS feeds")
+        if csv_path.exists():
+            logger.info(f"Using existing data: {csv_path}")
+            return csv_path
+        return None
+    
+    new_df = pd.DataFrame(new_entries, columns=CSV_COLUMNS)
+    
+    # Merge with existing data if present
+    if csv_path.exists():
+        try:
+            existing_df = pd.read_csv(csv_path, dtype=str)
+            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            logger.info(f"Merged {len(new_df)} new entries with {len(existing_df)} existing")
+        except Exception as e:
+            logger.warning(f"Could not read existing CSV, starting fresh: {e}")
+            combined_df = new_df
+    else:
+        combined_df = new_df
+    
+    # Deduplicate by report_id (keep most recent)
+    before_dedup = len(combined_df)
+    combined_df = combined_df.drop_duplicates(subset=["report_id"], keep="last")
+    combined_df = combined_df.reset_index(drop=True)
+    
+    if before_dedup != len(combined_df):
+        logger.info(f"Deduplicated: {before_dedup} -> {len(combined_df)} entries")
+    
+    # Write back (overwrite with clean, deduplicated data)
+    combined_df.to_csv(csv_path, index=False)
+    logger.info(f"aLOG data saved: {csv_path} ({len(combined_df)} total entries)")
+    
+    return csv_path
+
+
+# Legacy alias for compatibility
+def main(data_folder_path: str) -> Path | None:
+    """Legacy entry point. Use fetch_alog_entries() instead."""
+    return fetch_alog_entries(data_folder_path)
+
 
 if __name__ == "__main__":
-    main(config.DATA_FOLDER_PATH)
+    result = fetch_alog_entries()
+    if result:
+        logger.info(f"Success: {result}")
+    else:
+        logger.error("Failed to fetch aLOG entries")

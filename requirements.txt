@@ -1,0 +1,33 @@
+# GRAVITYbot dependencies
+
+# Azure OpenAI
+openai>=1.0.0
+
+# Data processing
+pandas>=2.0.0
+
+# Environment configuration
+python-dotenv>=1.0.0
+
+# Zooniverse API
+panoptes-client>=1.6.0
+
+# Timezone handling
+pytz>=2024.1
+
+# RSS feed parsing
+feedparser>=6.0.0
+
+# HTML/XML parsing
+beautifulsoup4>=4.12.0
+#lxml>=5.0.0
+
+# Markdown processing
+markdown>=3.5.0
+#markdownify>=0.11.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Testing (optional)
+pytest>=8.0.0

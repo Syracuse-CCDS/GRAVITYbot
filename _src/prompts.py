@@ -6,16 +6,23 @@ Original Author:
 
 Purpose:
     Prompt templates for GRAVITYbot LLM summarization tasks.
+    Purpose:
+        Prompt templates for GRAVITYbot LLM summarization tasks.
 
-    - ligo_prompt(): Summarizes Zooniverse Talk forum discussions for LIGO scientists
-    - alog_prompt(): Summarizes aLOG engineering posts for citizen scientists
+        - talk_prompt(): Summarizes Zooniverse Talk forum discussions for LIGO scientists
+        - alog_prompt(): Summarizes aLOG engineering posts for citizen scientists
 """
 
 import json
 
-import pandas
+import pandas as pd
 
 DATA_DELIMITER = "~~~"
+
+ALOG_BASE_URLS = {
+    "LHO": "https://alog.ligo-wa.caltech.edu",
+    "LLO": "https://alog.ligo-la.caltech.edu",
+}
 
 
 def format_data(data):
@@ -29,7 +36,7 @@ def format_data(data):
         str: A JSON-like string representation of the DataFrame records if `data` is a DataFrame;
              otherwise, returns `data` unchanged.
     """
-    if isinstance(data, pandas.DataFrame):
+    if isinstance(data, pd.DataFrame):
         records = data.to_dict(orient="records")
         records = ",\n ".join(map(json.dumps, records))
         return f"[\n {records}\n]"
@@ -37,13 +44,13 @@ def format_data(data):
     return data
 
 
-def ligo_prompt(talk_dat0, talk_dat1):
+def talk_prompt(prior_data, current_data):
     """
     Constructs prompts for summarizing Zooniverse Talk forum discussions.
 
     Args:
-        talk_dat0 (str): Formatted Talk data from the prior week.
-        talk_dat1 (str): Formatted Talk data from the current week.
+        prior_data (pandas.DataFrame): Talk data from the prior week.
+        current_data (pandas.DataFrame): Talk data from the current week.
 
     Returns:
         tuple: (user_prompt, sys_prompt) for the LLM.
@@ -57,10 +64,10 @@ def ligo_prompt(talk_dat0, talk_dat1):
     1080 Line, 1400 Ripple, 70 Hz Line, Air Compressor (50 Hz), Blip, Chirp, Crown, Extremely Loud, Helix, Koi Fish, Low-Frequency Line, No Glitch, Paired Doves, Pizzicato, Power Line (60 Hz), Repeating Blips, Scattered Light, Scratchy, Tomte, Violin Mode Harmonic, Wandering Line, Whistle.
 
     Consider "last week's" forum data:
-    {talk_dat0}
+    {format_data(prior_data)}
 
     Now consider "this week's" forum data:
-    {talk_dat1}
+    {format_data(current_data)}
 
     Using these two sets of data, please provide at least three bullet points to answer the following questions. Each bullet point requires a couple of sentences of response. For each major question please provide all relevant URLs in the final bullet for that major question following this format: [Reference Information](https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk/6872/3685209) where "Reference Information" should be a description of 3 words or less.
 
@@ -96,6 +103,12 @@ def ligo_prompt(talk_dat0, talk_dat1):
     return user_prompt, sys_prompt
 
 
+# Legacy alias for backward compatibility
+def ligo_prompt(talk_dat0, talk_dat1):
+    """Deprecated: Use talk_prompt() instead."""
+    return talk_prompt(talk_dat0, talk_dat1)
+
+
 def alog_prompt(prior_data, current_data, lab):
     """
     Constructs prompts for summarizing LIGO aLOG engineering posts.
@@ -110,9 +123,8 @@ def alog_prompt(prior_data, current_data, lab):
     """
     template_call_rep = "75875"
     template_link_text = f"{lab}: {template_call_rep}"
-    template_link_url = (
-        f"https://alog.ligo-la.caltech.edu/aLOG/index.php?callRep={template_call_rep}"
-    )
+    base_url = ALOG_BASE_URLS.get(lab, ALOG_BASE_URLS["LLO"])
+    template_link_url = f"{base_url}/aLOG/index.php?callRep={template_call_rep}"
 
     user_prompt = f"""
 The data involve discussions surrounding LIGO laboratory equipment. The data
