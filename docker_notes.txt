@@ -1,23 +1,81 @@
-docker build -t gravitybot . 
-sudo docker build -t gravitybot . 
+# GRAVITYbot Docker Notes
 
-##run shell
-docker run -it --entrypoint bash --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot
-docker run -it --entrypoint bash --mount src=.,target=/var/task,type=bind gravitybot
+## Building the Image
+
+```bash
+docker build -t gravitybot .
+# or with sudo if needed
+sudo docker build -t gravitybot .
+```
+
+## Interactive Shell (for debugging)
+
+```bash
+# Linux server
 docker run -it --entrypoint bash --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot
 
-## every tuesdays and fridays
-docker run -it --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__alog_summary_main__.py
-sudo docker run -it --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__alog_summary_main__.py
-sudo crontab -e
-    0 19 * * 2,5 /opt/GRAVITYbot/algo_summary.sh
+# Windows (Git Bash / PowerShell)
+docker run -it --entrypoint bash --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot
 
-# every monday
-docker run -it --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__talk_summary_main__.py 
-sudo docker run -it --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot python ./_src/__talk_summary_main__.py 
-sudo crontab -e
-    0 19 * * 1 /opt/GRAVITYbot/talk_summary.sh
+# Current directory
+docker run -it --entrypoint bash --mount src=$(pwd),target=/var/task,type=bind gravitybot
+```
 
-# test job
+## Manual Runs
+
+### aLOG Summary (Tuesdays and Fridays at 7pm)
+
+```bash
+# Linux server
+docker run -t --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot \
+    python ./_src/alog_summary.py
+
+# Windows
+docker run -t --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot \
+    python ./_src/alog_summary.py
+```
+
+### Talk Summary (Mondays at 7pm)
+
+```bash
+# Linux server
+docker run -t --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot \
+    python ./_src/talk_summary.py
+
+# Windows
+docker run -t --mount src=D:\github\GRAVITYbot,target=/var/task,type=bind gravitybot \
+    python ./_src/talk_summary.py
+```
+
+### Run Both Summaries
+
+```bash
+docker run -t --mount src=/opt/GRAVITYbot,target=/var/task,type=bind gravitybot \
+    python ./_src/run_all.py
+```
+
+## Cron Configuration
+
+Edit crontab:
+```bash
 sudo crontab -e
-    * * * * * /opt/GRAVITYbot/cron_test.sh
+```
+
+Add these entries:
+```cron
+# aLOG summary: Tuesdays and Fridays at 7pm
+0 19 * * 2,5 /opt/GRAVITYbot/alog_summary.sh
+
+# Talk summary: Mondays at 7pm  
+0 19 * * 1 /opt/GRAVITYbot/talk_summary.sh
+
+# Test job (every minute - for debugging only)
+# * * * * * /opt/GRAVITYbot/cron_test.sh
+```
+
+## Dry Run Mode
+
+To test without sending emails or posting to Zooniverse, set in `.env`:
+```bash
+GRAVITYBOT_DRY_RUN=true
+```

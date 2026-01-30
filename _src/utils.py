@@ -3,20 +3,61 @@ utils.py
 
 Shared utilities for GRAVITYbot.
 """
-
+import csv
+import json
+import logging
 import re
+from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
+
+# -----------------------------------------------------------------------------
+# File Conversion
+# -----------------------------------------------------------------------------
+
+def convert_json_to_csv(json_path: Path, csv_path: Path) -> None:
+    """
+    Convert a JSON array of objects to CSV.
+    
+    Args:
+        json_path: Path to input JSON file (must be array of flat objects)
+        csv_path: Path for output CSV file
+        
+    Note:
+        Assumes all objects have the same keys. Uses keys from first 
+        object as CSV column headers.
+    """
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+    
+    if not data:
+        logger.warning(f"Empty JSON file: {json_path}")
+        csv_path.touch()
+        return
+    
+    fieldnames = list(data[0].keys())
+    
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(data)
+
+
+# -----------------------------------------------------------------------------
+# Text Cleaning
+# -----------------------------------------------------------------------------
 
 def clean_text(text, source=None):
     """
-    Cleans and normalizes comment text by removing URLs, mentions, greetings,
+    Clean and normalize comment text by removing URLs, mentions, greetings,
     unwanted punctuation, and extra whitespace.
 
     Args:
         text (str): The raw comment text to clean.
         source (str, optional): Source type for additional cleaning rules.
             - "talk": Applies Zooniverse Talk-specific patterns
-            - "alog": Applies aLOG-specific patterns (default behavior)
+            - "alog": Applies aLOG-specific patterns
             - None: Base cleaning only
 
     Returns:

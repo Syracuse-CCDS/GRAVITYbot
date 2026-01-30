@@ -49,6 +49,12 @@ AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT")
 AZURE_OPENAI_EMBEDDING_DEPLOYMENT = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT")
 
 # ---------------------
+# LLM Defaults
+# ---------------------
+LLM_TEMPERATURE = float(os.environ.get("GRAVITYBOT_LLM_TEMPERATURE", "0.8"))
+LLM_MAX_TOKENS = int(os.environ.get("GRAVITYBOT_LLM_MAX_TOKENS", "4096"))
+
+# ---------------------
 # Panoptes / Zooniverse
 # ---------------------
 PANOPTES_SLUG = os.environ.get("PANOPTES_SLUG", "zooniverse/gravity-spy")
