@@ -181,7 +181,7 @@ def main():
     user_prompt, system_prompt = prompts.talk_prompt(prior_data, current_data)
     
     try:
-        summary = llm_client.generate(user_prompt, system_prompt)
+        summary = llm_client.generate(user_prompt, system_prompt, log_file="llm_talk.log")
     except llm_client.LLMError as e:
         logger.error(f"LLM generation failed: {e}")
         return

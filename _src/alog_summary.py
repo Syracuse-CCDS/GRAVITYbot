@@ -189,7 +189,11 @@ def summarize_lab(lab, data, date_ranges) -> str | None:
     
     try:
         user_prompt, system_prompt = prompts.alog_prompt(prior_data, current_data, lab)
-        summary = llm_client.generate(user_prompt, system_prompt)
+        summary = llm_client.generate(
+            user_prompt, 
+            system_prompt, 
+            log_file=f"llm_alog_{lab.lower()}.log"
+        )
         logger.info(f"{lab} summary generated ({len(summary)} chars)")
         return summary
         

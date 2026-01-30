@@ -6,6 +6,7 @@ Azure OpenAI client abstraction with logging and config-driven defaults.
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import openai
@@ -50,7 +51,7 @@ class LLMClient:
             azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
         )
         self._model = config.AZURE_OPENAI_DEPLOYMENT
-        self._log_path = config.OUTPUT_FOLDER_PATH / "llm_calls.log"
+        self._default_log_path = config.OUTPUT_FOLDER_PATH / "llm_calls.log"
     
     def generate(
         self,
@@ -59,6 +60,7 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         log_call: bool = True,
+        log_file: Optional[str] = None,
     ) -> str:
         """
         Generate a completion from the LLM.
@@ -69,6 +71,8 @@ class LLMClient:
             temperature: Sampling temperature (default from config.LLM_TEMPERATURE)
             max_tokens: Maximum response tokens (default from config.LLM_MAX_TOKENS)
             log_call: Whether to log the prompt/response to file
+            log_file: Log filename (in OUTPUT_FOLDER_PATH). Defaults to "llm_calls.log".
+                      Each unique log file is overwritten per run.
         
         Returns:
             The generated text response
@@ -96,7 +100,8 @@ class LLMClient:
             raise LLMError(f"Azure OpenAI API error: {e}") from e
         
         if log_call:
-            self._log_interaction(system_prompt, user_prompt, result)
+            log_path = config.OUTPUT_FOLDER_PATH / log_file if log_file else self._default_log_path
+            self._log_interaction(system_prompt, user_prompt, result, log_path)
         
         return result
     
@@ -106,6 +111,7 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         log_call: bool = True,
+        log_file: Optional[str] = None,
     ) -> str:
         """
         Generate a completion from a pre-built message list.
@@ -118,6 +124,7 @@ class LLMClient:
             temperature: Sampling temperature (default from config.LLM_TEMPERATURE)
             max_tokens: Maximum response tokens (default from config.LLM_MAX_TOKENS)
             log_call: Whether to log the prompt/response to file
+            log_file: Log filename (in OUTPUT_FOLDER_PATH). Defaults to "llm_calls.log".
             
         Returns:
             The generated text response
@@ -143,12 +150,13 @@ class LLMClient:
             # Extract system/user for logging (best effort)
             sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "")
             user_msg = next((m["content"] for m in messages if m["role"] == "user"), "")
-            self._log_interaction(sys_msg, user_msg, result)
+            log_path = config.OUTPUT_FOLDER_PATH / log_file if log_file else self._default_log_path
+            self._log_interaction(sys_msg, user_msg, result, log_path)
         
         return result
     
-    def _log_interaction(self, system_prompt: str, user_prompt: str, response: str):
-        """Append prompt/response to log file."""
+    def _log_interaction(self, system_prompt: str, user_prompt: str, response: str, log_path: Path):
+        """Write prompt/response to log file (overwrites)."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Truncate long prompts in log for readability
@@ -172,7 +180,7 @@ USER PROMPT ({len(user_prompt)} chars):
 RESPONSE ({len(response)} chars):
 {response}
 """
-        with open(self._log_path, "a", encoding="utf-8") as f:
+        with open(log_path, "w", encoding="utf-8") as f:
             f.write(log_entry)
     
     def test_connection(self) -> bool:
