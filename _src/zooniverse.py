@@ -334,7 +334,7 @@ def post_summary(
     body = f"## {title}\n\n{summary_content}\n\n{DISCUSSION_FOOTER}"
     
     # Zooniverse convention: +tab+ prefix opens links in new tab
-    body = re.sub(r"https://", r"+tab+https://", body)
+    body = re.sub(r'\]\(https://', r'](+tab+https://', body)
     
     # Build and send payload
     payload = {
