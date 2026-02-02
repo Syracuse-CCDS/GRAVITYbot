@@ -30,39 +30,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ---------------------
-# Constants
-# ---------------------
 SMTP_PORT = 587
 
 
-def format_summary_email(date_str: str, summary_content: str, summary_type: str = "talk") -> tuple[str, str, str]:
-    """
-    Format a summary for email delivery.
-    
-    Args:
-        date_str: Date string (YYYY-MM-DD) for the subject line
-        summary_content: The raw markdown summary text
-        summary_type: Type of summary ("talk" or "alog") for subject line
-        
-    Returns:
-        tuple: (subject, html_content, plain_text_content)
-    """
-    if summary_type == "talk":
-        subject = f"GRAVITYbot Talk Summary: {date_str}"
-    else:
-        subject = f"GRAVITYbot aLOG Summary: {date_str}"
-    
-    # Remove Zooniverse-specific link formatting for email
-    plain_text = summary_content.replace("+tab+", "")
-    
-    # Convert markdown to HTML
-    html = markdown.markdown(
-        plain_text,
+def _markdown_to_html(content: str) -> str:
+    """Convert markdown content to HTML."""
+    return markdown.markdown(
+        content,
         extensions=['fenced_code', 'codehilite', 'extra', 'sane_lists', 'nl2br']
     )
-    
-    return subject, html, plain_text
 
 
 def send_email(subject: str, html: str, text: str) -> None:
@@ -100,8 +76,8 @@ def send_talk_summary_email(date_str: str, summary_content: str) -> None:
         date_str: Date string (YYYY-MM-DD) for the subject
         summary_content: The markdown summary to send
     """
-    subject, html, text = format_summary_email(date_str, summary_content, "talk")
-    send_email(subject, html, text)
+    subject = f"GRAVITYbot Talk Summary: {date_str}"
+    send_email(subject, _markdown_to_html(summary_content), summary_content)
 
 
 def send_alog_summary_email(date_str: str, summary_content: str, lab: str) -> None:
@@ -114,11 +90,4 @@ def send_alog_summary_email(date_str: str, summary_content: str, lab: str) -> No
         lab: Lab identifier ("LHO" or "LLO") for the subject line
     """
     subject = f"GRAVITYbot {lab} aLOG Summary: {date_str}"
-    
-    plain_text = summary_content.replace("+tab+", "")
-    html = markdown.markdown(
-        plain_text,
-        extensions=['fenced_code', 'codehilite', 'extra', 'sane_lists', 'nl2br']
-    )
-    
-    send_email(subject, html, plain_text)
+    send_email(subject, _markdown_to_html(summary_content), summary_content)
