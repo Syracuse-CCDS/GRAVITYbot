@@ -159,6 +159,29 @@ class LLMClient:
         """Write prompt/response to log file (overwrites)."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        log_entry = f"""
+{'='*60}
+TIMESTAMP: {timestamp}
+{'='*60}
+SYSTEM PROMPT:
+{system_prompt}
+{'='*60}
+USER PROMPT ({len(user_prompt)} chars):
+{user_prompt}
+{'='*60}
+RESPONSE ({len(response)} chars):
+{response}
+{'='*60}
+        """
+
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(log_entry)
+
+
+    def _log_interaction2(self, system_prompt: str, user_prompt: str, response: str, log_path: Path):
+        """Write prompt/response to log file (overwrites)."""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         # Truncate long prompts in log for readability
         max_log_len = 2000
         user_display = (

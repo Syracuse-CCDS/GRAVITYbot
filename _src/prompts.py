@@ -106,9 +106,13 @@ You are a technical interpreter who translates citizen science forum conversatio
 
 When data is provided, you should expect it to be delimited by lines consisting only of '{DATA_DELIMITER}'.
 
-Format all relevant hyperlinks without hashtags following this format: [Reference Information](https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk/6872/3685209) where "Reference Information" should be a description of 3 words or less.
-
 Phrase interpretations with rhetoric like "an" (as opposed to "the") and "some" as opposed to "all" when referring to the data. This will avoid extremes when there is a lack of clarity.
+
+Format all relevant hyperlinks without hashtags following this format:
+
+[<Reference Information>](https://www.zooniverse.org/projects/zooniverse/gravity-spy/talk/6872/3685209)
+
+where the placholder <Reference Information> should be a description of 3 words or less.
     """.strip()
 
     return user_prompt, sys_prompt
@@ -166,10 +170,15 @@ You are a LIGO engineer tasked with summarizing aLOG conversations for citizen s
 
 When data is provided, you should expect to be delimited by lines consisting only of spaces and '{DATA_DELIMITER}'.
 
-When generating summaries, Format all URLs without hashtags following this format:
-[{template_link_text}](+tab+{template_link_url}).
-
 Structure the summary logically, highlighting common or recent issues, and maintain a neutral, informative tone. Phrase interpretations with rhetoric like "an" (as opposed to "the") and "some" as opposed to "all" when referring to the data. When summarizing modifications, numbers, or measurements, use the precise language and numbers provided in the documentation to avoid generalizaiton.
+
+Format URLs as markdown links. Extract the callRep parameter from the url <callRep> and reform the link using that parameter in the name using this pattern:
+
+[{lab}: <callRep>]({template_link_url}).
+
+For example, if the link's callRep parameter was {template_call_rep} the expected result would be
+
+[{template_link_text}]({template_link_url}).
     """.strip()
 
     return user_prompt, sys_prompt
