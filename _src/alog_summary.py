@@ -187,8 +187,27 @@ def summarize_lab(lab, data, date_ranges) -> str | None:
     
     logger.info(f"{lab}: {len(prior_data)} prior records, {len(current_data)} current records")
     
+    # Build prompts (always, so debug log is available even when we bail)
+    user_prompt, system_prompt = prompts.alog_prompt(prior_data, current_data, lab)
+
+    # Save prompt debug log regardless of whether we proceed
+    prompt_debug_path = config.OUTPUT_FOLDER_PATH / f"last_{lab.lower()}_alog_prompt.md"
+    prompt_debug_path.write_text(
+        f"# System Prompt\n\n{system_prompt}\n\n# User Prompt\n\n{user_prompt}",
+        encoding='utf-8'
+    )
+    logger.info(f"{lab} prompt debug log saved to {prompt_debug_path}")
+
+    # Guard: no point sending empty data to the LLM
+    if current_data.empty:
+        logger.warning(
+            f"No aLOG data for {lab} in current period "
+            f"({date_ranges['current_period_start']} to "
+            f"{date_ranges['current_period_end']}); skipping LLM summary"
+        )
+        return None
+
     try:
-        user_prompt, system_prompt = prompts.alog_prompt(prior_data, current_data, lab)
         summary = llm_client.generate(
             user_prompt, 
             system_prompt, 

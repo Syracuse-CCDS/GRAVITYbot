@@ -139,13 +139,13 @@ def main():
 
     current_day = datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
-    # Fetch data (or use existing in dry run mode)
+    # Fetch data (or use best available in dry run mode)
     if config.DRY_RUN:
-        csv_path = config.DATA_FOLDER_PATH / zooniverse.TALK_EXPORT_FILENAME
-        if not csv_path.exists():
-            logger.error(f"DRY RUN: No existing data at {csv_path}")
+        csv_path = zooniverse.find_best_local_export()
+        if csv_path is None:
+            logger.error("DRY RUN: No existing data (CSV or JSON) available")
             return
-        logger.info(f"DRY RUN: Using existing data from {csv_path}")
+        logger.info(f"DRY RUN: Using data from {csv_path}")
     else:
         csv_path = zooniverse.fetch_talk_export()
         if csv_path is None:
@@ -177,9 +177,27 @@ def main():
     
     logger.info(f"Talk: {len(prior_data)} prior records, {len(current_data)} current records")
 
-    # Generate LLM summary
+    # Build prompts (always, so debug log is available even when we bail)
     user_prompt, system_prompt = prompts.talk_prompt(prior_data, current_data)
-    
+
+    # Save prompt debug log regardless of whether we proceed
+    prompt_debug_path = config.OUTPUT_FOLDER_PATH / "last_talk_prompt.md"
+    prompt_debug_path.write_text(
+        f"# System Prompt\n\n{system_prompt}\n\n# User Prompt\n\n{user_prompt}",
+        encoding='utf-8'
+    )
+    logger.info(f"Prompt debug log saved to {prompt_debug_path}")
+
+    # Guard: no point sending empty data to the LLM
+    if current_data.empty:
+        logger.warning(
+            "No Talk data in current period "
+            f"({date_ranges['current_start']} to {date_ranges['current_end']}); "
+            "skipping LLM summary generation"
+        )
+        return
+
+    # Generate LLM summary
     try:
         summary = llm_client.generate(user_prompt, system_prompt, log_file="llm_talk.log")
     except llm_client.LLMError as e:

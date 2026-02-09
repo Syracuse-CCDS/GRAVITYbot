@@ -12,6 +12,7 @@ import io
 import logging
 import os
 import re
+import shutil
 import sys
 import tarfile
 import urllib.request
@@ -45,8 +46,6 @@ PROJECT_ID = 1104
 TALK_EXPORT_FILENAME = "talk_posts.csv"
 TALK_RAW_FILENAME = "talk_posts_raw.json"
 
-
-
 # Board IDs for posting different summary types
 SUMMARY_BOARD_IDS = {
     "talk": 6946,    # Gravity Spy Talk summaries
@@ -62,6 +61,14 @@ DISCUSSION_FOOTER = (
     "Any concerns, questions, or recommended updates can be directed to the "
     "Syracuse Gravity Spy research team."
 )
+
+# Phrases that indicate the LLM produced a fallback/empty summary
+INVALID_SUMMARY_INDICATORS = [
+    "cannot provide the structured outline",
+    "no data from",
+    "i cannot provide",
+    "if you have data or further instructions",
+]
 
 
 # ---------------------
@@ -150,6 +157,68 @@ def fetch_talk_export(data_folder_path: Path | str | None = None) -> Path | None
     return csv_path
 
 
+def prepare_local_export(json_path: Path | str,
+                         data_folder_path: Path | str | None = None) -> Path | None:
+    """
+    Convert a local raw JSON export to the canonical CSV.
+    
+    Use for dry runs or when fetch_talk_export() cannot download fresh data
+    but a raw JSON file is available locally (e.g., manually downloaded or
+    from a prior extraction that was never converted).
+    
+    Args:
+        json_path: Path to a project-{id}-comments_*.json file
+        data_folder_path: Directory for output. Defaults to config.DATA_FOLDER_PATH.
+    
+    Returns:
+        Path to the CSV file, or None if conversion failed.
+    """
+    json_path = Path(json_path)
+    if not json_path.exists():
+        logger.error(f"JSON file not found: {json_path}")
+        return None
+    
+    data_path = Path(data_folder_path) if data_folder_path else config.DATA_FOLDER_PATH
+    csv_path = data_path / TALK_EXPORT_FILENAME
+    
+    # Copy to canonical raw filename
+    raw_json_path = data_path / TALK_RAW_FILENAME
+    if json_path.resolve() != raw_json_path.resolve():
+        shutil.copy2(json_path, raw_json_path)
+        logger.info(f"Copied {json_path.name} -> {TALK_RAW_FILENAME}")
+    
+    csv_path = _convert_to_csv(raw_json_path, csv_path)
+    
+    if csv_path is not None:
+        # Clean up dated JSON files now that canonical CSV exists
+        for json_file in data_path.glob(f"project-{PROJECT_ID}-comments_*.json"):
+            json_file.unlink()
+            logger.debug(f"Removed dated file: {json_file.name}")
+    
+    return csv_path
+
+
+def find_best_local_export(data_folder_path: Path | str | None = None) -> Path | None:
+    """
+    Find the best available local export data without contacting Zooniverse.
+    
+    Prefers unconverted JSON (e.g., a manually downloaded or previously
+    extracted dated file) over an existing canonical CSV, since the JSON
+    may be newer.
+    
+    Use for dry runs or when the Zooniverse download is unavailable.
+    
+    Args:
+        data_folder_path: Directory to search. Defaults to config.DATA_FOLDER_PATH.
+    
+    Returns:
+        Path to a CSV file (converting JSON if needed), or None if no usable data found.
+    """
+    data_path = Path(data_folder_path) if data_folder_path else config.DATA_FOLDER_PATH
+    csv_path = data_path / TALK_EXPORT_FILENAME
+    return _find_existing_export(csv_path)
+
+
 def _request_talk_export() -> str | None:
     """
     Request a Talk export URL from Panoptes API.
@@ -191,6 +260,9 @@ def _download_and_extract_raw(url: str, data_path: Path) -> Path | None:
     """
     Download tarball from URL and extract raw JSON.
     
+    Inspects tarball members directly to identify the comment file,
+    avoiding confusion with stale files from prior runs in data_path.
+    
     Args:
         url: URL to the Talk export tarball
         data_path: Directory to extract files into
@@ -206,28 +278,37 @@ def _download_and_extract_raw(url: str, data_path: Path) -> Path | None:
         logger.info("Extracting tarball...")
         file_obj = io.BytesIO(tarball_bytes)
         with tarfile.open(fileobj=file_obj, mode='r:gz') as tar:
+            # Identify comment file(s) from tarball members before extracting
+            comment_members = [
+                m for m in tar.getmembers()
+                if re.match(rf"project-{PROJECT_ID}-comments_.*\.json$", m.name)
+            ]
+            
+            if not comment_members:
+                logger.error("No comment JSON files found in tarball")
+                return None
+            
+            if len(comment_members) > 1:
+                logger.warning(
+                    f"Multiple comment files in tarball: "
+                    f"{[m.name for m in comment_members]}"
+                )
+                comment_members.sort(key=lambda m: m.name, reverse=True)
+            
+            logger.info(f"Tarball contains: {[m.name for m in comment_members]}")
             tar.extractall(path=str(data_path))
         
-        # Find the JSON file extracted from tarball
-        # Panoptes names files: project-{id}-comments_{date}.json
-        json_files = list(data_path.glob(f"project-{PROJECT_ID}-comments_*.json"))
-        logger.info(f"Tarball contained: {[f.name for f in json_files]}")
-        
-        if len(json_files) != 1:
-            logger.error(f"Expected 1 JSON file in tarball, found {len(json_files)}")
-            return None
-        
-        source_json = json_files[0]
+        source_json = data_path / comment_members[0].name
         
         # Rename to canonical raw filename (overwrites previous)
         raw_json_path = data_path / TALK_RAW_FILENAME
-        source_json.rename(raw_json_path)
+        source_json.replace(raw_json_path)
         logger.info(f"Saved raw export: {TALK_RAW_FILENAME}")
         
-        # Clean up any other dated JSON files
+        # Clean up any dated JSON files (from this or prior extractions)
         for json_file in data_path.glob(f"project-{PROJECT_ID}-comments_*.json"):
             json_file.unlink()
-            logger.debug(f"Removed intermediate file: {json_file.name}")
+            logger.debug(f"Removed dated file: {json_file.name}")
         
         return raw_json_path
         
@@ -254,10 +335,10 @@ def _convert_to_csv(raw_json_path: Path, csv_path: Path) -> Path | None:
         utils.convert_json_to_csv(raw_json_path, csv_path)
         logger.info(f"Talk data saved: {csv_path}")
         
-        # Clean up old dated CSV files if any exist
+        # Dated CSVs should not exist; warn if they do and clean up
         for old_csv in csv_path.parent.glob(f"project-{PROJECT_ID}-comments_*.csv"):
+            logger.warning(f"Removing unexpected legacy CSV: {old_csv.name}")
             old_csv.unlink()
-            logger.debug(f"Removed old export: {old_csv.name}")
         
         return csv_path
         
@@ -268,27 +349,59 @@ def _convert_to_csv(raw_json_path: Path, csv_path: Path) -> Path | None:
 
 def _find_existing_export(csv_path: Path) -> Path | None:
     """
-    Find existing Talk export CSV.
+    Find existing usable export data.
     
     Used as fallback when fresh export cannot be obtained.
+    Prefers unconverted JSON over stale CSV, since a dated JSON
+    file may be newer than the last successfully converted CSV.
     
     Returns:
-        Path to CSV file, or None if not found.
+        Path to CSV file, or None if no usable data found.
     """
+    data_path = csv_path.parent
+    
+    # First: check for a raw JSON that hasn't been converted yet
+    json_files = sorted(
+        data_path.glob(f"project-{PROJECT_ID}-comments_*.json"),
+        key=lambda p: p.name, reverse=True
+    )
+    if json_files:
+        logger.info(f"Found unconverted JSON export: {json_files[0].name}")
+        return prepare_local_export(json_files[0], data_path)
+    
+    # Second: check for canonical CSV from a prior successful run
     if csv_path.exists():
         logger.info(f"Using existing Talk export: {csv_path.name}")
         return csv_path
     
-    # Fall back to legacy dated files
-    csv_files = list(csv_path.parent.glob(f"project-{PROJECT_ID}-comments_*.csv"))
+    # Dated CSVs should not exist; flag if they do
+    stale_csvs = list(data_path.glob(f"project-{PROJECT_ID}-comments_*.csv"))
+    if stale_csvs:
+        logger.warning(
+            f"Found unexpected legacy CSV files (cleanup issue?): "
+            f"{[f.name for f in stale_csvs]}"
+        )
     
-    if not csv_files:
-        logger.error(f"No existing Talk exports found in {csv_path.parent}")
-        return None
+    logger.error(f"No existing Talk export found in {data_path}")
+    return None
+
+
+# ---------------------
+# Summary Validation
+# ---------------------
+
+def _is_valid_summary(content: str) -> bool:
+    """
+    Check that summary content is substantive, not an LLM fallback.
     
-    latest = max(csv_files, key=lambda p: p.stat().st_mtime)
-    logger.info(f"Using existing Talk export: {latest.name}")
-    return latest
+    Returns False if content is empty, too short, or contains known
+    phrases that indicate the LLM had no data to summarize.
+    """
+    stripped = content.strip()
+    if not stripped or len(stripped) < 150:
+        return False
+    content_lower = stripped.lower()
+    return not any(ind in content_lower for ind in INVALID_SUMMARY_INDICATORS)
 
 
 # ---------------------
@@ -304,6 +417,10 @@ def post_summary(
 ) -> None:
     """
     Post a summary to the appropriate Zooniverse Talk forum.
+    
+    Validates that summary_content is substantive before posting.
+    If the content appears to be an LLM fallback (no data available),
+    the post is skipped and a warning is logged.
     
     Args:
         summary_type: Type of summary - "talk" or "alog"
@@ -329,6 +446,14 @@ def post_summary(
             title = f"Gravity Spy Talk Summary: {date_str}"
         else:
             title = f"{lab} aLOG Summary: {date_str}"
+    
+    # Validate summary content before posting
+    if not _is_valid_summary(summary_content):
+        logger.warning(
+            f"Skipping post for '{title}': "
+            "summary content is empty or appears to be an LLM fallback"
+        )
+        return
     
     # Build discussion body with footer
     body = f"## {title}\n\n{summary_content}\n\n{DISCUSSION_FOOTER}"
