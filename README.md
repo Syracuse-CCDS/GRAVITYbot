@@ -17,10 +17,10 @@ Gravity Spy is a citizen science project that classifies glitches occurring in T
 2. Summarizing Talk pages for citizen scientists
 3. Logging dynamics of citizen science learning through automated weekly or sub-weekly updates
 
+NOTICE: A somewhat related project is under development for a Gravity Spy chatbot. This project and the chatbot will be RAG-based using a central database that provides relevant scientific, engineering, and linguistic context.
+
 ### Possible Future Tasks
 
-- A chatbot for promoting locations in the project chat or wiki
-- A chatbot that promotes contributions to the project chat or wiki
 - RAG-based retrieval for contextual responses
 
 ## Getting Started
